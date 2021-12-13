@@ -75,7 +75,8 @@ class QuadrupedGymEnv(gym.Env):
       render=False,
       record_video=False,
       add_noise=True,
-      test_env=False, # NOT ALLOWED FOR TRAINING!
+      test_env=False,
+      competition_env=True, # NOT ALLOWED FOR TRAINING!
       **kwargs): # any extra arguments from legacy
     """Initialize the quadruped gym environment.
 
@@ -97,6 +98,7 @@ class QuadrupedGymEnv(gym.Env):
       record_video: Whether to record a video of each trial.
       add_noise: vary coefficient of friction
       test_env: add random terrain 
+      competition_env: course competition block format, fixed coefficient of friction 
     """
     self._robot_config = robot_config
     self._isRLGymInterface = isRLGymInterface
@@ -113,6 +115,11 @@ class QuadrupedGymEnv(gym.Env):
     self._is_record_video = record_video
     self._add_noise = add_noise
     self._using_test_env = test_env
+    self._using_competition_env = competition_env
+    if competition_env:
+      test_env = False
+      self._using_test_env = False
+      self._add_noise = False
     if test_env:
       self._add_noise = True
       self._observation_noise_stdev = 0.01 #
@@ -359,6 +366,12 @@ class QuadrupedGymEnv(gym.Env):
                                          motor_control_mode=self._motor_control_mode,
                                          on_rack=self._on_rack,
                                          render=self._is_render))
+      if self._using_competition_env:
+        self._ground_mu_k = ground_mu_k = 0.8
+        self._pybullet_client.changeDynamics(self.plane, -1, lateralFriction=ground_mu_k)
+        self.add_competition_blocks()
+        self._add_noise = False # double check
+        self._using_test_env = False # double check 
 
       if self._add_noise:
         ground_mu_k = mu_min+(1-mu_min)*np.random.random()
@@ -370,6 +383,7 @@ class QuadrupedGymEnv(gym.Env):
       if self._using_test_env:
         self.add_random_boxes()
         self._add_base_mass_offset()
+
     else:
       self.robot.Reset(reload_urdf=False)
 
@@ -579,6 +593,30 @@ class QuadrupedGymEnv(gym.Env):
                           basePosition = [x_upp/2,y_low,0.5],baseOrientation=orn)
     block2=self._pybullet_client.createMultiBody(baseMass=0,baseCollisionShapeIndex = sh_colBox,
                           basePosition = [x_upp/2,-y_low,0.5],baseOrientation=orn)
+
+  def add_competition_blocks(self, num_stairs=100, stair_height=0.12, stair_width=0.25):
+    """Wide, long so can't get around """
+    y = 6
+    block_x = stair_width * np.ones(num_stairs)
+    block_z = np.arange(0,num_stairs)
+    t = np.linspace(0,2*np.pi,num_stairs)
+    block_z = stair_height*block_z/num_stairs * np.cos(block_z*np.pi/3 * t)
+    curr_x = 1
+    curr_z = 0 
+    # loop through
+    for i in range(num_stairs):
+      curr_z = block_z[i]
+      if curr_z > 0.005:
+        sh_colBox = self._pybullet_client.createCollisionShape(self._pybullet_client.GEOM_BOX,
+            halfExtents=[block_x[i]/2,y/2,curr_z/2])
+        orn = self._pybullet_client.getQuaternionFromEuler([0,0,0])
+        block2=self._pybullet_client.createMultiBody(baseMass=0,baseCollisionShapeIndex = sh_colBox,
+                              basePosition = [curr_x,0,curr_z/2],baseOrientation=orn)
+        # set friction coefficient 
+        self._pybullet_client.changeDynamics(block2, -1, lateralFriction=self._ground_mu_k)
+
+      curr_x += block_x[i]
+
 
   def _add_base_mass_offset(self, spec_mass=None, spec_location=None):
     """Attach mass to robot base."""
