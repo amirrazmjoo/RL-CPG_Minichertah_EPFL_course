@@ -76,7 +76,7 @@ class QuadrupedGymEnv(gym.Env):
       record_video=False,
       add_noise=True,
       test_env=False,
-      competition_env=True, # NOT ALLOWED FOR TRAINING!
+      competition_env=False, # NOT ALLOWED FOR TRAINING!
       **kwargs): # any extra arguments from legacy
     """Initialize the quadruped gym environment.
 
