@@ -1,3 +1,33 @@
+# SPDX-FileCopyrightText: Copyright (c) 2022 Guillaume Bellegarda. All rights reserved.
+# SPDX-License-Identifier: BSD-3-Clause
+# 
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice, this
+# list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+# this list of conditions and the following disclaimer in the documentation
+# and/or other materials provided with the distribution.
+#
+# 3. Neither the name of the copyright holder nor the names of its
+# contributors may be used to endorse or promote products derived from
+# this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+# DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+# SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+# CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+# OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# Copyright (c) 2022 EPFL, Guillaume Bellegarda
+
 """Motor model for quadrupeds."""
 
 import collections
@@ -8,7 +38,7 @@ NUM_MOTORS = 12
 CONTROL_MODES = [ "TORQUE","PD" ]
 
 class QuadrupedMotorModel(object):
-  """A simple motor model for A1.
+  """A simple motor model for a quadruped.
 
     When in POSITION mode, the torque is calculated according to the difference
     between current and desired joint angle, as well as the joint velocity.
@@ -30,7 +60,7 @@ class QuadrupedMotorModel(object):
     self._kd = kd
     self._torque_limits = torque_limits
     if torque_limits is not None:
-      if isinstance(torque_limits, (collections.Sequence, np.ndarray)):
+      if isinstance(torque_limits, (collections.abc.Sequence, np.ndarray)):
         self._torque_limits = np.asarray(torque_limits)
       else:
         self._torque_limits = np.full(NUM_MOTORS, torque_limits)
