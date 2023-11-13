@@ -51,6 +51,20 @@ import quadruped
 import configs_a1 as robot_config
 from hopf_network import HopfNetwork
 
+# few helpers 
+def unit_vector(vector):
+	""" Returns the unit vector of the vector.  """
+	return vector / np.linalg.norm(vector)
+
+def angle_between(v1, v2):
+	""" Returns the angle in radians between vectors 'v1' and 'v2' """
+	v1_u = unit_vector(v1)
+	v2_u = unit_vector(v2)
+	return np.arccos(np.clip(np.dot(v1_u, v2_u), -1.0, 1.0))
+
+def rotation_matrix(theta):
+	return np.array([ [np.cos(theta), -np.sin(theta) ], [np.sin(theta), np.cos(theta)] ])
+
 
 ACTION_EPS = 0.01
 OBSERVATION_EPS = 0.01
@@ -63,6 +77,8 @@ VIDEO_LOG_DIRECTORY = 'videos/' + datetime.datetime.now().strftime("vid-%Y-%m-%d
 # Tasks to be learned with reinforcement learning
 #     - "FWD_LOCOMOTION"
 #         reward forward progress only
+#     - "FLAGRUN"
+#         move to goal, once reached, a new goal is randomly selected.
 #     - "LR_COURSE_TASK" 
 #         [TODO: what should you train for?]
 #         Ideally we want to command A1 to run in any direction while expending minimal energy
@@ -154,6 +170,7 @@ class QuadrupedGymEnv(gym.Env):
     self._add_noise = add_noise
     self._using_test_env = test_env
     self._using_competition_env = competition_env
+    self.goal_id = None
     if competition_env:
       test_env = False
       self._using_test_env = False
@@ -298,7 +315,47 @@ class QuadrupedGymEnv(gym.Env):
 
     return max(reward,0) # keep rewards positive
 
+  def get_distance_and_angle_to_goal(self):
+    """ Helper to return distance and angle to current goal location. """
+    # current object location
+    base_pos = self.robot.GetBasePosition()
+    yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
+    goal_vec = self._goal_location
+    dist_to_goal = np.linalg.norm(base_pos[0:2]-goal_vec)
 
+    # angle to goal (from current heading)
+    body_dir_vec = np.matmul( rotation_matrix(yaw), np.array([[1],[0]]) )
+    body_goal_vec = goal_vec - base_pos[0:2]
+    body_dir_vec = body_dir_vec.reshape(2,)
+    body_goal_vec = body_goal_vec.reshape(2,)
+
+    Vn = unit_vector( np.array([0,0,1]) )
+    c = np.cross( np.hstack([body_dir_vec,0]), np.hstack([body_goal_vec,0])  )
+    angle = angle_between(body_dir_vec, body_goal_vec)
+    angle = angle * np.sign( np.dot( Vn , c ) )
+
+    return dist_to_goal, angle
+  
+  def _reward_flag_run(self):
+    """ Learn to move towards goal location. """
+    curr_dist_to_goal, angle = self.get_distance_and_angle_to_goal()
+
+    # minimize distance to goal (we want to move towards the goal)
+    dist_reward = 10 * ( self._prev_pos_to_goal - curr_dist_to_goal)
+    # minimize yaw deviation to goal (necessary?)
+    yaw_reward = 0 # -0.01 * np.abs(angle) 
+
+    # minimize energy 
+    energy_reward = 0 
+    for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
+      energy_reward += np.abs(np.dot(tau,vel)) * self._time_step
+
+    reward = dist_reward \
+            + yaw_reward \
+            - 0.001 * energy_reward 
+    
+    return max(reward,0) # keep rewards positive
+    
   def _reward_lr_course(self):
     """ Implement your reward function here. How will you improve upon the above? """
     # [TODO] add your reward function. 
@@ -310,6 +367,8 @@ class QuadrupedGymEnv(gym.Env):
       return self._reward_fwd_locomotion()
     elif self._TASK_ENV == "LR_COURSE_TASK":
       return self._reward_lr_course()
+    elif self._TASK_ENV == "FLAGRUN":
+      return self._reward_flag_run()
     else:
       raise ValueError("This task mode not implemented yet.")
 
@@ -424,6 +483,8 @@ class QuadrupedGymEnv(gym.Env):
     # save motor torques and velocities to compute power in reward function
     self._dt_motor_torques = []
     self._dt_motor_velocities = []
+    if "FLAGRUN" in self._TASK_ENV:
+      self._prev_pos_to_goal, _ = self.get_distance_and_angle_to_goal()
     
     for _ in range(self._action_repeat):
       if self._isRLGymInterface: 
@@ -445,6 +506,11 @@ class QuadrupedGymEnv(gym.Env):
     done = False
     if self._termination() or self.get_sim_time() > self._MAX_EP_LEN:
       done = True
+
+    if "FLAGRUN" in self._TASK_ENV:
+      dist_to_goal, _ = self.get_distance_and_angle_to_goal()
+      if dist_to_goal < 0.5:
+        self._reset_goal()
 
     return np.array(self._noisy_observation()), reward, done, {'base_pos': self.robot.GetBasePosition()} 
 
@@ -489,6 +555,11 @@ class QuadrupedGymEnv(gym.Env):
         self.add_random_boxes()
         self._add_base_mass_offset()
 
+
+      if self._TASK_ENV == "FLAGRUN":
+        self.goal_id = None
+        self._reset_goal()
+
     else:
       self.robot.Reset(reload_urdf=False)
 
@@ -507,6 +578,24 @@ class QuadrupedGymEnv(gym.Env):
       self.recordVideoHelper()
     return self._noisy_observation()
 
+  def _reset_goal(self):
+    """Reset goal location. """
+    try:
+      if self.goal_id is not None: 
+        self._pybullet_client.removeBody(self.goal_id)
+    except:
+      pass
+    self._goal_location = 6 * (np.random.random((2,)) - 0.5) 
+    self._goal_location += self.robot.GetBasePosition()[0:2]
+    sh_colBox = self._pybullet_client.createCollisionShape(self._pybullet_client.GEOM_BOX,
+        halfExtents=[0.2,0.2,0.2])
+    orn = self._pybullet_client.getQuaternionFromEuler([0,0,0])
+    self.goal_id=self._pybullet_client.createMultiBody(
+                          baseMass=0,
+                          baseCollisionShapeIndex = sh_colBox,
+                          basePosition = [self._goal_location[0],self._goal_location[1],0.6],
+                          baseOrientation=orn)
+    # print('goal is at ', self._goal_location)
 
   def _settle_robot(self):
     """ Settle robot and add noise to init configuration. """

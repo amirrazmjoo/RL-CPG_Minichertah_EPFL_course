@@ -56,7 +56,7 @@
       <geometry>
         <mesh filename="package://a1_description/meshes/trunk.STL" scale="1 1 1"/> <!-- STL -->
       </geometry>
-      <material name="white"/>
+      <material name="black"/>
     </visual>
     <collision>
       <origin rpy="0 0 0" xyz="0 0 0"/>
@@ -184,7 +184,7 @@
       <geometry>
         <mesh filename="package://a1_description/meshes/calf.STL" scale="1 1 1"/>
       </geometry>
-      <material name="grey"/>
+      <material name="red"/>
     </visual>
     <collision>
       <origin rpy="0 1.57079632679 0" xyz="0 0 -0.1"/>
@@ -341,7 +341,7 @@
       <geometry>
         <mesh filename="package://a1_description/meshes/calf.STL" scale="1 1 1"/>
       </geometry>
-      <material name="grey"/>
+      <material name="green"/>
     </visual>
     <collision>
       <origin rpy="0 1.57079632679 0" xyz="0 0 -0.1"/>
@@ -498,7 +498,7 @@
       <geometry>
         <mesh filename="package://a1_description/meshes/calf.STL" scale="1 1 1"/>
       </geometry>
-      <material name="grey"/>
+      <material name="blue"/>
     </visual>
     <collision>
       <origin rpy="0 1.57079632679 0" xyz="0 0 -0.1"/>
@@ -655,7 +655,7 @@
       <geometry>
         <mesh filename="package://a1_description/meshes/calf.STL" scale="1 1 1"/>
       </geometry>
-      <material name="grey"/>
+      <material name="orange"/>
     </visual>
     <collision>
       <origin rpy="0 1.57079632679 0" xyz="0 0 -0.1"/>
