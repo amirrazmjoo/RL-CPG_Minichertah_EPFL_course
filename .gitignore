@@ -1,4 +1,4 @@
 .DS_Store
 *.egg-info
-__pycache__/
+env/__pycache__/
 logs/

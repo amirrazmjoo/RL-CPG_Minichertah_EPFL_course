@@ -62,13 +62,20 @@ env = QuadrupedGymEnv(render=True,              # visualize
                     )
 
 # initialize Hopf Network, supply gait
-cpg = HopfNetwork(time_step=TIME_STEP)
+omega_stance = 2*2*np.pi
+omega_swing = 5*2*np.pi
+cpg = HopfNetwork(time_step=TIME_STEP, omega_stance=omega_stance, omega_swing=omega_swing)
 
-TEST_STEPS = int(10 / (TIME_STEP))
+TEST_STEPS = int(5 / (TIME_STEP))
 t = np.arange(TEST_STEPS)*TIME_STEP
 
 # [TODO] initialize data structures to save CPG and robot states
-
+cpg_states_hist = np.zeros((4, 4, TEST_STEPS))
+des_foot_pos_hist = np.zeros((4, 2, TEST_STEPS))
+real_foot_pos_hist = np.zeros((4, 2, TEST_STEPS))
+des_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
+real_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
+real_joint_vel_hist = np.zeros((4, 3, TEST_STEPS))
 
 ############## Sample Gains
 # joint PD gains
@@ -83,9 +90,15 @@ for j in range(TEST_STEPS):
   action = np.zeros(12) 
   # get desired foot positions from CPG 
   xs,zs = cpg.update()
+  # Save foot_pos
+  des_foot_pos_hist[:,:,j] = np.transpose(np.vstack((xs, zs)))
+
+
   # [TODO] get current motor angles and velocities for joint PD, see GetMotorAngles(), GetMotorVelocities() in quadruped.py
-  # q = env.robot.GetMotorAngles()
-  # dq = 
+  q = env.robot.GetMotorAngles()
+  dq = env.robot.GetMotorVelocities() 
+  #print("Shape of motor angles: ", np.shape(q))
+  #print("Shape of motor velocities: ", np.shape(dq))
 
   # loop through desired foot positions and calculate torques
   for i in range(4):
@@ -94,34 +107,88 @@ for j in range(TEST_STEPS):
     # get desired foot i pos (xi, yi, zi) in leg frame
     leg_xyz = np.array([xs[i],sideSign[i] * foot_y,zs[i]])
     # call inverse kinematics to get corresponding joint angles (see ComputeInverseKinematics() in quadruped.py)
-    leg_q = np.zeros(3) # [TODO] 
+    leg_q = env.robot.ComputeInverseKinematics(i,leg_xyz) # [TODO] 
     # Add joint PD contribution to tau for leg i (Equation 4)
-    tau += np.zeros(3) # [TODO] 
+    tau += kp*(leg_q - q[3*i:3*i+3]) + kd*(-dq[3*i:3*i+3]) # [TODO] 
 
+    # Get current Jacobian and foot position in leg frame (see ComputeJacobianAndPosition() in quadruped.py)
+    J, foot_pos = env.robot.ComputeJacobianAndPosition(i)
     # add Cartesian PD contribution
     if ADD_CARTESIAN_PD:
-      # Get current Jacobian and foot position in leg frame (see ComputeJacobianAndPosition() in quadruped.py)
-      # [TODO] 
       # Get current foot velocity in leg frame (Equation 2)
-      # [TODO] 
+      foot_vel = J @ dq[3*i:3*i+3]
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
-      tau += np.zeros(3) # [TODO]
+      tau += J.T @ (kpCartesian @ (leg_xyz - foot_pos) + kdCartesian @ (-foot_vel)) # [TODO]
 
     # Set tau for legi in action vector
     action[3*i:3*i+3] = tau
+
+    # Save joints pos and vel
+    real_joint_pos_hist[i,:,j] = q[3*i:3*i+3]
+    real_joint_vel_hist[i,:,j] = dq[3*i:3*i+3]
+    des_joint_pos_hist[i,:,j] = leg_q
+    # Get real pos
+    real_foot_pos_hist[i,:,j] = foot_pos[[0,2]]
+    #time.sleep(0.001)
 
   # send torques to robot and simulate TIME_STEP seconds 
   env.step(action) 
 
   # [TODO] save any CPG or robot states
-
+  cpg_states_hist[:,:,j] = np.transpose(np.vstack((cpg.get_r(), cpg.get_theta(), cpg.get_dr(), cpg.get_dtheta())))
 
 
 ##################################################### 
 # PLOTS
 #####################################################
-# example
-# fig = plt.figure()
-# plt.plot(t,joint_pos[1,:], label='FR thigh')
-# plt.legend()
-# plt.show()
+order_indices = [(0,1), (0,0), (1,1), (1,0)]
+# Desired vs actual foot pose
+fig, ax1 = plt.subplots(2,2,sharey=True)
+fig.suptitle("Desired vs actual foot trajectories")
+titles = ['FR', 'FL', 'HR', 'HL']
+for i in range(4):
+  ax1[order_indices[i]].plot(des_foot_pos_hist[i,0,:], des_foot_pos_hist[i,1,:], 'b-')
+  ax1[order_indices[i]].plot(real_foot_pos_hist[i,0,:], real_foot_pos_hist[i,1,:], 'r')
+  ax1[order_indices[i]].set_title(titles[i])
+
+ax1[0,0].legend(['des_foot_pos', 'actual_foot_pos'])
+ax1[1,0].set_xlabel("x")
+ax1[order_indices[1]].set_ylabel("z")
+
+# CPG parameters
+begin_range = (int)(0/TIME_STEP)
+plot_range = (int)((2*np.pi/omega_stance + 2*np.pi/omega_swing)/TIME_STEP)
+fig2, ax2 = plt.subplots(2,2, sharey=True)
+fig2.suptitle("CPG parameters")
+for i in range(4):
+  ax2[order_indices[i]].plot(cpg_states_hist[i,1,begin_range:begin_range+plot_range])
+  ax2[order_indices[i]].set_title(titles[i])
+  ax2[order_indices[i]].plot(cpg_states_hist[i,3,begin_range:begin_range+plot_range])
+  ax2y = ax2[order_indices[i]].secondary_yaxis('right', ylim=(0,2))
+  ax2[order_indices[i]].plot(cpg_states_hist[i,0,begin_range:begin_range+plot_range])
+  ax2[order_indices[i]].plot(cpg_states_hist[i,2,begin_range:begin_range+plot_range])
+
+ax2[0,0].legend([r'$\theta$', r'$\dot{\theta}$', 'r', r'$\dot{r}$'])
+ax2[1,0].set_xlabel("Timesteps")
+ax2[0,0].set_ylabel(r'$\theta$')
+ax2y = ax2[0,0].secondary_yaxis('right', ylim=(0,2))
+ax2y.set_ylabel("r")
+
+
+fig3, ax3 = plt.subplots(2,2, sharey=True)
+fig2.suptitle("Joints desired vs actual position")
+for i in range(4):
+  ax3[order_indices[i]].plot(des_joint_pos_hist[i,0,begin_range:begin_range+plot_range], 'r--')
+  ax3[order_indices[i]].plot(des_joint_pos_hist[i,1,begin_range:begin_range+plot_range], 'b--')
+  ax3[order_indices[i]].plot(des_joint_pos_hist[i,2,begin_range:begin_range+plot_range], 'm--')
+  ax3[order_indices[i]].plot(real_joint_pos_hist[i,0,begin_range:begin_range+plot_range], 'r-')
+  ax3[order_indices[i]].plot(real_joint_pos_hist[i,1,begin_range:begin_range+plot_range], 'b-')
+  ax3[order_indices[i]].plot(real_joint_pos_hist[i,2,begin_range:begin_range+plot_range], 'm-')
+
+ax3[0,0].legend([r'$q_{0,des}$', r'$q_{1,des}$', r'$q_{2,des}$', 
+                                r'$q_{0,act}$', r'$q_{1,act}$', r'$q_{2,act}$'])
+ax3[0,0].set_xlabel('Timesteps')
+ax3[0,0].set_ylabel('angle (q)')
+
+plt.show()
+
