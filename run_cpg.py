@@ -79,7 +79,7 @@ real_joint_vel_hist = np.zeros((4, 3, TEST_STEPS))
 
 ############## Sample Gains
 # joint PD gains
-kp=np.array([200,200,200])
+kp=np.array([100,100,100])
 kd=np.array([2,2,2])
 # Cartesian PD gains
 kpCartesian = np.diag([500]*3)
