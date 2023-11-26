@@ -96,6 +96,10 @@ class HopfNetwork():
     self._max_step_len_rl = max_step_len_rl
     if use_RL:
       self.X[0,:] = MU_LOW # mapping MU_LOW=1 to MU_UPP=2
+    # For adding orientation
+    self.psi_rl = np.zeros(4)
+    self.X_extra_rl = np.zeros(4) # Contains phi 
+    self.X_dot_extra_rl = np.zeros((2,4)) # Contains r_ddot & phi_dot 
 
 
 
@@ -121,25 +125,36 @@ class HopfNetwork():
     
 
 
-  def update(self):
+  def update(self, use_psi=False):
     """ Update oscillator states. """
 
     # update parameters, integrate
     if not self.use_RL:
       self._integrate_hopf_equations()
-    else:
+    elif not use_psi:
       self._integrate_hopf_equations_rl()
+    else:
+      self._integrate_hopf_equations_rl_psi()
     
     # map CPG variables to Cartesian foot xz positions (Equations 8, 9) 
     x = np.zeros(4) # [TODO]
     z = np.zeros(4) # [TODO]
-    for i in range(4):
-      x[i] = -self._des_step_len*self.get_r()[i]*np.cos(self.get_theta()[i])
-      if np.sin(self.get_theta()[i]) > 0:
-        z[i] = -self._robot_height + self._ground_clearance*np.sin(self.get_theta()[i])
-      else:
-        z[i] = -self._robot_height + self._ground_penetration*np.sin(self.get_theta()[i])
-      
+    if not use_psi:
+      for i in range(4):
+        x[i] = -self._des_step_len*self.get_r()[i]*np.cos(self.get_theta()[i])
+        if np.sin(self.get_theta()[i]) > 0:
+          z[i] = -self._robot_height + self._ground_clearance*np.sin(self.get_theta()[i])
+        else:
+          z[i] = -self._robot_height + self._ground_penetration*np.sin(self.get_theta()[i])
+    else:
+      y = np.zeros(4)
+      for i in range(4):
+        x[i] = -self._des_step_len*(self.get_r()[i]-1)*np.cos(self.get_theta()[i])*np.cos(self.X_extra_rl[i])
+        y[i] = -self._des_step_len*(self.get_r()[i]-1)*np.cos(self.get_theta()[i])*np.sin(self.X_extra_rl[i])
+        if np.sin(self.get_theta()[i]) > 0:
+          z[i] = -self._robot_height + self._ground_clearance*np.sin(self.get_theta()[i])
+        else:
+          z[i] = -self._robot_height + self._ground_penetration*np.sin(self.get_theta()[i])
 
     # scale x by step length
     if not self.use_RL:
@@ -148,7 +163,10 @@ class HopfNetwork():
     else:
       # RL uses amplitude to set max step length
       r = np.clip(self.X[0,:],MU_LOW,MU_UPP) 
-      return -self._max_step_len_rl * (r - MU_LOW) * np.cos(self.X[1,:]), z
+      if not use_psi:
+        return -self._max_step_len_rl * (r - MU_LOW) * np.cos(self.X[1,:]), z
+      else:
+        return -self._max_step_len_rl * (r - MU_LOW) * np.cos(self.X[1,:]), y, z
 
       
         
@@ -206,6 +224,12 @@ class HopfNetwork():
   def get_dtheta(self):
     """ Get CPG phase derivatives (theta_dot) """
     return self.X_dot[1,:]
+  
+  def get_phi(self):
+    return self.X_extra_rl
+  
+  def get_dphi(self):
+    return self.X_dot_extra_rl[1,:]
 
   ###################### Functions for setting parameters for RL
   def set_omega_rl(self, omegas):
@@ -215,6 +239,10 @@ class HopfNetwork():
   def set_mu_rl(self, mus):
     """ Set intrinsic amplitude setpoints. """
     self._mu_rl = mus
+
+  def set_psi_rl(self, psi):
+    """ Set intrinsic amplitude setpoints. """
+    self.psi_rl = psi
 
   def _integrate_hopf_equations_rl(self):
     """ Hopf polar equations and integration, using quantities set by RL """
@@ -228,9 +256,9 @@ class HopfNetwork():
       # get r_i, theta_i from X
       r, theta = X[:,i]
       # amplitude (use mu from RL, i.e. self._mu_rl[i])
-      r_dot = 0  # [TODO]
+      r_dot = self._alpha*(self._mu_rl[i] - r**2)*r # [TODO]
       # phase (use omega from RL, i.e. self._omega_rl[i])
-      theta_dot = 0 # [TODO]
+      theta_dot = self._omega_rl[i] # [TODO]
 
       X_dot[:,i] = [r_dot, theta_dot]
 
@@ -238,3 +266,40 @@ class HopfNetwork():
     self.X = X + (X_dot_prev + X_dot) * self._dt / 2
     self.X_dot = X_dot
     self.X[1,:] = self.X[1,:] % (2*np.pi)
+
+  def _integrate_hopf_equations_rl_psi(self, a=150):
+    """ Hopf polar equations and integration, using quantities set by RL with extra variable psi"""
+    # bookkeeping - save copies of current CPG states 
+    X = self.X.copy()
+    X_dot_prev = self.X_dot.copy() 
+    X_dot = np.zeros((2,4))
+    X_extra = self.X_extra_rl.copy()
+    X_extra_dot_prev = self.X_dot_extra_rl.copy()
+    X_extra_dot = np.zeros((2,4))
+
+    # loop through each leg's oscillator, find current velocities
+    for i in range(4): 
+      r_dot = X_dot_prev[0,i]
+      # get r_i, theta_i from X
+      r, theta = X[:,i]
+      # amplitude (use mu from RL, i.e. self._mu_rl[i])
+      r_ddot = a*(a/4*(self._mu_rl[i] - r) - r_dot)
+      # phase (use omega from RL, i.e. self._omega_rl[i])
+      theta_dot = self._omega_rl[i] # [TODO]
+      # Orientation
+      phi_dot = self.psi_rl[i]
+
+      X_dot[:,i] = [r_dot, theta_dot]
+      X_extra_dot[:,i] = [r_ddot, phi_dot]
+
+    # integrate 
+    # First r_dot
+    X_dot[0,:] =  X_dot[0,:] + (X_extra_dot_prev[0,:] + X_extra_dot[0,:])*self._dt/2
+    # Second phi
+    self.X_extra_rl = X_extra + (X_extra_dot_prev[1,:] + X_extra_dot[1,:])*self._dt/2
+    # Third theta and r
+    self.X = X + (X_dot_prev + X_dot) * self._dt / 2
+    self.X_dot = X_dot
+    self.X_dot_extra_rl = X_extra_dot
+    self.X[1,:] = self.X[1,:] % (2*np.pi)
+

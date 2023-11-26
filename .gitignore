@@ -2,3 +2,6 @@
 *.egg-info
 env/__pycache__/
 logs/
+videos/
+.logs/
+utils/__pycache__/
