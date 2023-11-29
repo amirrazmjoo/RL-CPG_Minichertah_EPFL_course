@@ -43,19 +43,21 @@ from utils.utils import CheckpointCallback
 from utils.file_utils import get_latest_model
 # gym environment
 from env.quadruped_gym_env import QuadrupedGymEnv
+import sys
+cur_dir = sys.path[0]
 
-
-LEARNING_ALG = "PPO" # or "SAC"
+LEARNING_ALG = "SAC" # or "SAC"
 LOAD_NN = False # if you want to initialize training with a previous model 
-NUM_ENVS = 1    # how many pybullet environments to create for data collection
-USE_GPU = False # make sure to install all necessary drivers 
+NUM_ENVS = 64    # how many pybullet environments to create for data collection
+USE_GPU = True # make sure to install all necessary drivers 
 
-LEARNING_ALG = "SAC";  USE_GPU = True
+# LEARNING_ALG = "SAC";  USE_GPU = True
 # after implementing, you will want to test how well the agent learns with your MDP: 
 # env_configs = {"motor_control_mode":"CPG",
 #                "task_env": "FLAGRUN", #  "LR_COURSE_TASK",
 #                "observation_space_mode": "LR_COURSE_OBS"}
-env_configs = {}
+env_configs = {"motor_control_mode":"CPG"}
+# env_configs = {}
 
 if USE_GPU and LEARNING_ALG=="SAC":
     gpu_arg = "auto" 
@@ -63,16 +65,16 @@ else:
     gpu_arg = "cpu"
 
 if LOAD_NN:
-    interm_dir = "./logs/intermediate_models/"
+    interm_dir = cur_dir + "/logs/intermediate_models/"
     log_dir = interm_dir + '' # add path
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
 # directory to save policies and normalization parameters
-SAVE_PATH = './logs/intermediate_models/'+ datetime.now().strftime("%m%d%y%H%M%S") + '/'
+SAVE_PATH = cur_dir + '/logs/intermediate_models/'+ datetime.now().strftime("%m%d%y%H%M%S") + '/'
 os.makedirs(SAVE_PATH, exist_ok=True)
 # checkpoint to save policy network periodically
-checkpoint_callback = CheckpointCallback(save_freq=30000, save_path=SAVE_PATH,name_prefix='rl_model', verbose=2)
+checkpoint_callback = CheckpointCallback(save_freq=int(30000/NUM_ENVS), save_path=SAVE_PATH,name_prefix='rl_model', verbose=2)
 # create Vectorized gym environment
 env = lambda: QuadrupedGymEnv(**env_configs)  
 env = make_vec_env(env, monitor_dir=SAVE_PATH,n_envs=NUM_ENVS)

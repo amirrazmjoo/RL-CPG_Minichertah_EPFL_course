@@ -452,6 +452,9 @@ class QuadrupedGymEnv(gym.Env):
     # get motor kp and kd gains (can be modified)
     kp = self._robot_config.MOTOR_KP # careful of size!
     kd = self._robot_config.MOTOR_KD
+
+    kpCartesian = self._robot_config.kpCartesian
+    kdCartesian = self._robot_config.kdCartesian
     # get current motor velocities
     q = self.robot.GetMotorAngles()
     dq = self.robot.GetMotorVelocities()
@@ -463,11 +466,23 @@ class QuadrupedGymEnv(gym.Env):
       x = xs[i]
       y = sideSign[i] * foot_y # careful of sign
       z = zs[i]
+      leg_xyz = np.array([x,y,z])
 
       # call inverse kinematics to get corresponding joint angles
-      q_des = np.zeros(3) # [TODO]
-      # Add joint PD contribution to tau
-      tau = np.zeros(3) # [TODO] 
+      q_des = self.robot.ComputeInverseKinematics(i,leg_xyz)
+      
+      # Add joint PD contribution to tau for leg i (Equation 4)
+      # print('===================')
+      # print(q_des.shape,q.shape)
+      # print('===================')
+      kp_i = np.diag(kp[3*i:3*i+3])
+      kd_i = np.diag(kd[3*i:3*i+3])
+      tau = kp_i @ (q_des - q[3*i:3*i+3]) - kd_i @ dq[3*i:3*i+3] 
+
+      # add Cartesian PD contribution
+      J, x = self.robot.ComputeJacobianAndPosition(i)
+      dx = J @ dq[3*i:3*i+3]
+      tau += J.T @ (kpCartesian @ (leg_xyz - x) - kdCartesian @ dx) 
 
       # add Cartesian PD contribution (as you wish)
       # tau +=
@@ -856,7 +871,7 @@ class QuadrupedGymEnv(gym.Env):
 def test_env():
   env = QuadrupedGymEnv(render=True, 
                         on_rack=True,
-                        motor_control_mode='PD',
+                        motor_control_mode='CPG',
                         action_repeat=100,
                         )
 

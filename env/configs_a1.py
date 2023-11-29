@@ -113,12 +113,12 @@ MOTOR_KD = [2.0, 2.0, 2.0] * NUM_LEGS
 kpCartesian = np.diag([500,500,500])
 kdCartesian = np.diag([10,10,10])
 
-kpCartesian = np.diag([700,700,700])
-kdCartesian = np.diag([12,12,12])
+# kpCartesian = np.diag([700,700,700])
+# kdCartesian = np.diag([12,12,12])
 
-# for simulation only 
-kpCartesian = np.diag([1000,1000,1000])
-kdCartesian = np.diag([20,20,20])
+# # for simulation only 
+# kpCartesian = np.diag([1000,1000,1000])
+# kdCartesian = np.diag([20,20,20])
 
 ##################################################################################
 # Hip, thigh, calf strings, naming conventions from URDF (don't modify)
