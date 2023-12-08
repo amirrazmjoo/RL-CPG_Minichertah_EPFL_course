@@ -45,6 +45,7 @@ from utils.file_utils import get_latest_model
 from env.quadruped_gym_env import QuadrupedGymEnv
 import sys
 cur_dir = sys.path[0]
+import torch
 
 LEARNING_ALG = "PPO" # or "SAC"
 LOAD_NN = False # if you want to initialize training with a previous model 
@@ -87,7 +88,7 @@ if LOAD_NN:
     env = VecNormalize.load(stats_path, env)
 
 # Multi-layer perceptron (MLP) policy of two layers of size _,_ 
-policy_kwargs = dict(net_arch=[256,256])
+policy_kwargs = dict(activation_fn=torch.nn.ELU,net_arch=[512,256,128])
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
 n_steps = 4096 
 learning_rate = lambda f: 1e-4 
