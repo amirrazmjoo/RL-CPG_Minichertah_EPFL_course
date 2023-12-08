@@ -60,11 +60,11 @@ from utils.file_utils import get_latest_model, load_all_results
 LEARNING_ALG = "SAC"
 interm_dir = cur_dir + "/env/logs/intermediate_models/"
 # path to saved models, i.e. interm_dir + '121321105810'
-log_dir = interm_dir + '112823144506'
+log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_12_08_08_46/'
 
 # initialize env configs (render at test time)
 # check ideal conditions, as well as robustness to UNSEEN noise during training
-env_config = {"motor_control_mode":"CPG"}
+env_config = {"motor_control_mode":"CPG","observation_space_mode": "LR_COURSE_OBS"}
 env_config['render'] = True
 env_config['record_video'] = False
 env_config['add_noise'] = False 

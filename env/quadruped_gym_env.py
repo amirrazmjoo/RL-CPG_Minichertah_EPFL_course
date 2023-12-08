@@ -221,11 +221,33 @@ class QuadrupedGymEnv(gym.Env):
                                          -self._robot_config.VELOCITY_LIMITS,
                                          np.array([-1.0]*4))) -  OBSERVATION_EPS)
     elif self._observation_space_mode == "LR_COURSE_OBS":
-      # [TODO] Set observation upper and lower ranges. What are reasonable limits? 
-      # Note 50 is arbitrary below, you may have more or less
-      # if using CPG-RL, remember to include limits on these
-      observation_high = (np.zeros(50) + OBSERVATION_EPS)
-      observation_low = (np.zeros(50) -  OBSERVATION_EPS)
+      upper_bound = np.concatenate((self._robot_config.UPPER_ANGLE_JOINT,
+                                         self._robot_config.VELOCITY_LIMITS,
+                                         np.array([1]),
+                                         np.array([1.0]*4),
+                                         np.array([1,0.2,0.2]),
+                                         np.array([1,1,1]),
+                                         np.array([40,40,40,40]),
+                                         np.array([1,1,1,1]),
+                                         np.array([1,1,1,1]),
+                                         np.array([2,2,2,2])*np.pi,
+                                         np.array([3,3,3,3]),
+                                         np.array([10,10,10,10])))
+      
+      lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
+                                         -self._robot_config.VELOCITY_LIMITS,
+                                         np.array([0]),
+                                         np.array([-1.0]*4),
+                                         np.array([0,-0.2,-0.2]),
+                                         np.array([-1,-1,-1]),
+                                         np.array([0,0,0,0]),
+                                         np.array([0,0,0,0]),
+                                         np.array([0,0,0,0]),
+                                         np.array([0,0,0,0]),
+                                         np.array([-3,-3,-3,-3]),
+                                         np.array([-10,-10,-10,-10])))
+      observation_high = (upper_bound + OBSERVATION_EPS)
+      observation_low = (lower_bound -  OBSERVATION_EPS)
     else:
       raise ValueError("observation space not defined or not intended")
 
@@ -249,12 +271,21 @@ class QuadrupedGymEnv(gym.Env):
     if self._observation_space_mode == "DEFAULT":
       self._observation = np.concatenate((self.robot.GetMotorAngles(), 
                                           self.robot.GetMotorVelocities(),
-                                          self.robot.GetBaseOrientation() ))
+                                          self.robot.GetBaseOrientation()))
+      
     elif self._observation_space_mode == "LR_COURSE_OBS":
-      # [TODO] Get observation from robot. What are reasonable measurements we could get on hardware?
-      # if using the CPG, you can include states with self._cpg.get_r(), for example
-      # 50 is arbitrary
-      self._observation = np.zeros(50)
+      self._observation = np.concatenate((self.robot.GetMotorAngles(), 
+                                          self.robot.GetMotorVelocities(),
+                                          np.array([self.robot.GetBasePosition()[2]]),
+                                          self.robot.GetBaseOrientation(),
+                                          self.robot.GetBaseLinearVelocity(),
+                                          self.robot.GetBaseAngularVelocity(),
+                                          self.robot.GetContactInfo()[2],
+                                          self.robot.GetContactInfo()[3],
+                                          self._cpg.X[0,:],
+                                          self._cpg.X[1,:],
+                                          self._cpg.X_dot[0,:],
+                                          self._cpg.X_dot[1,:]))
 
     else:
       raise ValueError("observation space not defined or not intended")
@@ -294,14 +325,15 @@ class QuadrupedGymEnv(gym.Env):
     """Decide whether we should stop the episode and reset the environment. """
     return self.is_fallen() 
 
-  def _reward_fwd_locomotion(self, des_vel_x=0.5):
+  def _reward_fwd_locomotion(self, des_vel_x=1):
     """Learn forward locomotion at a desired velocity. """
     # track the desired velocity 
     vel_tracking_reward = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2 )
     # minimize yaw (go straight)
     yaw_reward = -0.2 * np.abs(self.robot.GetBaseOrientationRollPitchYaw()[2]) 
     # don't drift laterally 
-    drift_reward = -0.01 * abs(self.robot.GetBasePosition()[1]) 
+    drift_reward_y = -0.01 * abs(self.robot.GetBasePosition()[1]) 
+    drift_reward_z = -0.01 * abs(self.robot.GetBasePosition()[2]) 
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
@@ -309,7 +341,8 @@ class QuadrupedGymEnv(gym.Env):
 
     reward = vel_tracking_reward \
             + yaw_reward \
-            + drift_reward \
+            + drift_reward_y \
+            + drift_reward_z \
             - 0.01 * energy_reward \
             - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
 

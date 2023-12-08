@@ -46,9 +46,9 @@ from env.quadruped_gym_env import QuadrupedGymEnv
 import sys
 cur_dir = sys.path[0]
 
-LEARNING_ALG = "SAC" # or "SAC"
+LEARNING_ALG = "PPO" # or "SAC"
 LOAD_NN = False # if you want to initialize training with a previous model 
-NUM_ENVS = 64    # how many pybullet environments to create for data collection
+NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
 # LEARNING_ALG = "SAC";  USE_GPU = True
@@ -56,7 +56,7 @@ USE_GPU = True # make sure to install all necessary drivers
 # env_configs = {"motor_control_mode":"CPG",
 #                "task_env": "FLAGRUN", #  "LR_COURSE_TASK",
 #                "observation_space_mode": "LR_COURSE_OBS"}
-env_configs = {"motor_control_mode":"CPG"}
+env_configs = {"motor_control_mode":"CPG","observation_space_mode": "LR_COURSE_OBS"}
 # env_configs = {}
 
 if USE_GPU and LEARNING_ALG=="SAC":
@@ -71,7 +71,7 @@ if LOAD_NN:
     model_name = get_latest_model(log_dir)
 
 # directory to save policies and normalization parameters
-SAVE_PATH = cur_dir + '/logs/intermediate_models/'+ datetime.now().strftime("%m%d%y%H%M%S") + '/'
+SAVE_PATH = cur_dir + '/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_'+ datetime.now().strftime("%m_%d_%H_%M") + '/'
 os.makedirs(SAVE_PATH, exist_ok=True)
 # checkpoint to save policy network periodically
 checkpoint_callback = CheckpointCallback(save_freq=int(30000/NUM_ENVS), save_path=SAVE_PATH,name_prefix='rl_model', verbose=2)
