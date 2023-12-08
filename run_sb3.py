@@ -48,7 +48,7 @@ cur_dir = sys.path[0]
 import torch
 
 LEARNING_ALG = "PPO" # or "SAC"
-LOAD_NN = False # if you want to initialize training with a previous model 
+LOAD_NN = True # if you want to initialize training with a previous model 
 NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
@@ -66,8 +66,8 @@ else:
     gpu_arg = "cpu"
 
 if LOAD_NN:
-    interm_dir = cur_dir + "/logs/intermediate_models/"
-    log_dir = interm_dir + '' # add path
+    # interm_dir = cur_dir + "/logs/intermediate_models/"
+    log_dir = '/idiap/temp/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_12_08_15_54/'
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -83,7 +83,7 @@ env = make_vec_env(env, monitor_dir=SAVE_PATH,n_envs=NUM_ENVS)
 env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
 if LOAD_NN:
-    env = lambda: QuadrupedGymEnv()
+    env = lambda: QuadrupedGymEnv(**env_configs)
     env = make_vec_env(env, n_envs=NUM_ENVS)
     env = VecNormalize.load(stats_path, env)
 

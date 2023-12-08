@@ -232,7 +232,8 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([1,1,1,1]),
                                          np.array([2,2,2,2])*np.pi,
                                          np.array([3,3,3,3]),
-                                         np.array([10,10,10,10])))
+                                         np.array([10,10,10,10]),
+                                         np.array([2])))
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
                                          -self._robot_config.VELOCITY_LIMITS,
@@ -245,7 +246,8 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([0,0,0,0]),
                                          np.array([0,0,0,0]),
                                          np.array([-3,-3,-3,-3]),
-                                         np.array([-10,-10,-10,-10])))
+                                         np.array([-10,-10,-10,-10]),
+                                         np.array([0])))
       observation_high = (upper_bound + OBSERVATION_EPS)
       observation_low = (lower_bound -  OBSERVATION_EPS)
     else:
@@ -285,7 +287,8 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X[0,:],
                                           self._cpg.X[1,:],
                                           self._cpg.X_dot[0,:],
-                                          self._cpg.X_dot[1,:]))
+                                          self._cpg.X_dot[1,:],
+                                          np.array([self._des_vel])))
 
     else:
       raise ValueError("observation space not defined or not intended")
@@ -325,9 +328,10 @@ class QuadrupedGymEnv(gym.Env):
     """Decide whether we should stop the episode and reset the environment. """
     return self.is_fallen() 
 
-  def _reward_fwd_locomotion(self, des_vel_x=1):
+  def _reward_fwd_locomotion(self):
     """Learn forward locomotion at a desired velocity. """
     # track the desired velocity 
+    des_vel_x = self._des_vel
     vel_tracking_reward = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2 )
     # minimize yaw (go straight)
     yaw_reward = -0.2 * np.abs(self.robot.GetBaseOrientationRollPitchYaw()[2]) 
@@ -598,6 +602,8 @@ class QuadrupedGymEnv(gym.Env):
         self._pybullet_client.changeDynamics(self.plane, -1, lateralFriction=ground_mu_k)
         if self._is_render:
           print('ground friction coefficient is', ground_mu_k)
+
+      self._des_vel = 2 * np.random.rand()
 
       if self._using_test_env:
         self.add_random_boxes()
