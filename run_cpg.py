@@ -73,9 +73,11 @@ t = np.arange(TEST_STEPS)*TIME_STEP
 cpg_states_hist = np.zeros((4, 4, TEST_STEPS))
 des_foot_pos_hist = np.zeros((4, 2, TEST_STEPS))
 real_foot_pos_hist = np.zeros((4, 2, TEST_STEPS))
+foot_vel_hist = np.zeros((4,3, TEST_STEPS))
 des_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
 real_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
 real_joint_vel_hist = np.zeros((4, 3, TEST_STEPS))
+normal_force_hist = np.zeros((4, TEST_STEPS))
 
 ############## Sample Gains
 # joint PD gains
@@ -117,6 +119,7 @@ for j in range(TEST_STEPS):
     if ADD_CARTESIAN_PD:
       # Get current foot velocity in leg frame (Equation 2)
       foot_vel = J @ dq[3*i:3*i+3]
+      foot_vel_hist[i,:,j] = foot_vel
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
       tau += J.T @ (kpCartesian @ (leg_xyz - foot_pos) + kdCartesian @ (-foot_vel)) # [TODO]
 
@@ -129,6 +132,9 @@ for j in range(TEST_STEPS):
     des_joint_pos_hist[i,:,j] = leg_q
     # Get real pos
     real_foot_pos_hist[i,:,j] = foot_pos[[0,2]]
+
+    normal_force_hist[:,j] = env.robot.GetContactInfo()[2]
+
     #time.sleep(0.001)
 
   # send torques to robot and simulate TIME_STEP seconds 
@@ -176,7 +182,7 @@ ax2y.set_ylabel("r")
 
 
 fig3, ax3 = plt.subplots(2,2, sharey=True)
-fig2.suptitle("Joints desired vs actual position")
+fig3.suptitle("Joints desired vs actual position")
 for i in range(4):
   ax3[order_indices[i]].plot(des_joint_pos_hist[i,0,begin_range:begin_range+plot_range], 'r--')
   ax3[order_indices[i]].plot(des_joint_pos_hist[i,1,begin_range:begin_range+plot_range], 'b--')
@@ -189,6 +195,23 @@ ax3[0,0].legend([r'$q_{0,des}$', r'$q_{1,des}$', r'$q_{2,des}$',
                                 r'$q_{0,act}$', r'$q_{1,act}$', r'$q_{2,act}$'])
 ax3[0,0].set_xlabel('Timesteps')
 ax3[0,0].set_ylabel('angle (q)')
+
+fig4, ax4 = plt.subplots(2,2)
+fig4.suptitle('Feet velocities')
+for i in range(3):
+  ax4[0,0].plot(foot_vel_hist[i,0,:])
+  ax4[0,1].plot(foot_vel_hist[i,1,:])
+  ax4[1,0].plot(foot_vel_hist[i,2,:])
+ax4[0,0].legend([f'Leg {i}' for i in range(4)])
+
+fig5, ax5 = plt.subplots(1,1)
+fig5.suptitle('Foot normal contact force')
+ax5.set_ylabel('Force (N)')
+ax5.set_xlabel('Timesteps')
+for i in range(4):
+  ax5.plot(normal_force_hist[i,:])
+ax5.legend([f'Foot {k}' for k in range(1,5)])
+
 
 plt.show()
 
