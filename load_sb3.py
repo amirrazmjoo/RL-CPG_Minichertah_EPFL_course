@@ -60,7 +60,7 @@ from utils.file_utils import get_latest_model, load_all_results
 LEARNING_ALG = "PPO"
 interm_dir = cur_dir + "/env/logs/intermediate_models/"
 # path to saved models, i.e. interm_dir + '121321105810'
-log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_12_08_15_54/'
+log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_12_08_23_15/'
 
 # initialize env configs (render at test time)
 # check ideal conditions, as well as robustness to UNSEEN noise during training

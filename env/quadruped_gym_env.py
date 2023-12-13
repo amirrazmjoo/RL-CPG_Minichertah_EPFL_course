@@ -229,11 +229,12 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([1,1,1]),
                                          np.array([40,40,40,40]),
                                          np.array([1,1,1,1]),
-                                         np.array([1,1,1,1]),
-                                         np.array([2,2,2,2])*np.pi,
-                                         np.array([3,3,3,3]),
-                                         np.array([10,10,10,10]),
-                                         np.array([2])))
+                                         np.array([5,5,5,5]), #r
+                                         np.array([2,2,2,2])*np.pi, #\theta
+                                         np.array([20,20,20,20]), #\rdot
+                                         np.array([50,50,50,50]),#\thetadot
+                                         np.array([2]),
+                                         np.array([1.0]*self.action_dim)))
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
                                          -self._robot_config.VELOCITY_LIMITS,
@@ -243,11 +244,12 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([-1,-1,-1]),
                                          np.array([0,0,0,0]),
                                          np.array([0,0,0,0]),
-                                         np.array([0,0,0,0]),
-                                         np.array([0,0,0,0]),
-                                         np.array([-3,-3,-3,-3]),
-                                         np.array([-10,-10,-10,-10]),
-                                         np.array([0])))
+                                         np.array([0,0,0,0]), #r
+                                         np.array([0,0,0,0]),#\theta
+                                         np.array([-20,-20,-20,-20]), #\dot{r}
+                                         np.array([-50,-50,-50,-50]),#dot{theta}
+                                         np.array([0]),
+                                         np.array([-1.0]* self._action_dim)))
       observation_high = (upper_bound + OBSERVATION_EPS)
       observation_low = (lower_bound -  OBSERVATION_EPS)
     else:
@@ -288,7 +290,8 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X[1,:],
                                           self._cpg.X_dot[0,:],
                                           self._cpg.X_dot[1,:],
-                                          np.array([self._des_vel])))
+                                          np.array([self._des_vel]),
+                                          self._prev_action))
 
     else:
       raise ValueError("observation space not defined or not intended")
@@ -469,9 +472,9 @@ class QuadrupedGymEnv(gym.Env):
 
   def ScaleActionToCPGStateModulations(self,actions):
     """Scale RL action to CPG modulation parameters."""
-    # clip RL actions to be between -1 and 1 (standard RL technique)
+    # clip RL actions to be between -1  1 (standard RL technique)
     u = np.clip(actions,-1,1)
-
+    self._prev_action = u
     # scale omega to ranges, and set in CPG (range is an example)
     omega = self._scale_helper( u[0:4], 5, 4.5*2*np.pi)
     self._cpg.set_omega_rl(omega)
@@ -481,7 +484,7 @@ class QuadrupedGymEnv(gym.Env):
     self._cpg.set_mu_rl(mus)
 
     # integrate CPG, get mapping to foot positions
-    xs,zs = self._cpg.update()
+    xs,zs = self._cpg.update(use_psi = True)
 
     # IK parameters
     foot_y = self._robot_config.HIP_LINK_LENGTH
@@ -604,7 +607,7 @@ class QuadrupedGymEnv(gym.Env):
           print('ground friction coefficient is', ground_mu_k)
 
       self._des_vel = 2 * np.random.rand()
-
+      self._prev_action = np.zeros([self._action_dim,])
       if self._using_test_env:
         self.add_random_boxes()
         self._add_base_mass_offset()

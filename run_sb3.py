@@ -84,7 +84,7 @@ env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
 if LOAD_NN:
     env = lambda: QuadrupedGymEnv(**env_configs)
-    env = make_vec_env(env, n_envs=NUM_ENVS)
+    env = make_vec_env(env, n_envs=NUM_ENVS, monitor_dir=SAVE_PATH)
     env = VecNormalize.load(stats_path, env)
 
 # Multi-layer perceptron (MLP) policy of two layers of size _,_ 
@@ -140,10 +140,9 @@ if LOAD_NN:
     print("\nLoaded model", model_name, "\n")
 
 # Learn and save (may need to train for longer)
-model.learn(total_timesteps=1000000, log_interval=1,callback=checkpoint_callback)
+model.learn(total_timesteps=5000000, log_interval=1,callback=checkpoint_callback)
 # Don't forget to save the VecNormalize statistics when saving the agent
 model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
 env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
 if LEARNING_ALG == "SAC": # save replay buffer 
     model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
-
