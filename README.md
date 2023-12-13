@@ -9,4 +9,4 @@
 |Default|Default|Default|andom Initialization of the robot state|(?)|(?)|
 |Default|Foot slipage|Default|Default|(?)|(?)|
 |Default|air-time|Default|Default|(?)|(?)|
-|Default|Smooth action $||a^t - a^{t-1}||$|Default|Default|(?)|(?)|
+|Default|Smooth action (difference between actions in time-steps)|Default|Default|(?)|(?)|
