@@ -607,7 +607,7 @@ class QuadrupedGymEnv(gym.Env):
         if self._is_render:
           print('ground friction coefficient is', ground_mu_k)
       self._tot_time_step += 1
-      self._des_vel = 2*(self._tot_time_step/1e6) * np.random.rand()
+      self._des_vel = 1 + (np.tanh((self._tot_time_step - 5e5)/15e4) * np.random.rand())
       self._prev_action = np.zeros([self._action_dim,])
       if self._using_test_env:
         self.add_random_boxes()
