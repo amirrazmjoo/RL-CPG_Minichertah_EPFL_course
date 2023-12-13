@@ -171,6 +171,7 @@ class QuadrupedGymEnv(gym.Env):
     self._using_test_env = test_env
     self._using_competition_env = competition_env
     self.goal_id = None
+    self._tot_time_step = 0
     if competition_env:
       test_env = False
       self._using_test_env = False
@@ -234,7 +235,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([20,20,20,20]), #\rdot
                                          np.array([50,50,50,50]),#\thetadot
                                          np.array([2]),
-                                         np.array([1.0]*self.action_dim)))
+                                         np.array([1.0]*self._action_dim)))
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
                                          -self._robot_config.VELOCITY_LIMITS,
@@ -484,7 +485,7 @@ class QuadrupedGymEnv(gym.Env):
     self._cpg.set_mu_rl(mus)
 
     # integrate CPG, get mapping to foot positions
-    xs,zs = self._cpg.update(use_psi = True)
+    xs,ys, zs = self._cpg.update(use_psi = True)
 
     # IK parameters
     foot_y = self._robot_config.HIP_LINK_LENGTH
@@ -504,7 +505,7 @@ class QuadrupedGymEnv(gym.Env):
     for i in range(4):
       # get desired foot i pos (xi, yi, zi)
       x = xs[i]
-      y = sideSign[i] * foot_y # careful of sign
+      y = sideSign[i] * foot_y + ys[i] # careful of sign
       z = zs[i]
       leg_xyz = np.array([x,y,z])
 
@@ -605,8 +606,8 @@ class QuadrupedGymEnv(gym.Env):
         self._pybullet_client.changeDynamics(self.plane, -1, lateralFriction=ground_mu_k)
         if self._is_render:
           print('ground friction coefficient is', ground_mu_k)
-
-      self._des_vel = 2 * np.random.rand()
+      self._tot_time_step += 1
+      self._des_vel = 2*(self._tot_time_step/1e6) * np.random.rand()
       self._prev_action = np.zeros([self._action_dim,])
       if self._using_test_env:
         self.add_random_boxes()

@@ -48,7 +48,7 @@ cur_dir = sys.path[0]
 import torch
 
 LEARNING_ALG = "PPO" # or "SAC"
-LOAD_NN = True # if you want to initialize training with a previous model 
+LOAD_NN = False # if you want to initialize training with a previous model 
 NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
@@ -72,7 +72,7 @@ if LOAD_NN:
     model_name = get_latest_model(log_dir)
 
 # directory to save policies and normalization parameters
-SAVE_PATH = cur_dir + '/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_'+ datetime.now().strftime("%m_%d_%H_%M") + '/'
+SAVE_PATH = cur_dir + '/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_'+ datetime.now().strftime("%m_%d_%H_%M") + '/'
 os.makedirs(SAVE_PATH, exist_ok=True)
 # checkpoint to save policy network periodically
 checkpoint_callback = CheckpointCallback(save_freq=int(30000/NUM_ENVS), save_path=SAVE_PATH,name_prefix='rl_model', verbose=2)
@@ -140,7 +140,7 @@ if LOAD_NN:
     print("\nLoaded model", model_name, "\n")
 
 # Learn and save (may need to train for longer)
-model.learn(total_timesteps=5000000, log_interval=1,callback=checkpoint_callback)
+model.learn(total_timesteps=1000000, log_interval=1,callback=checkpoint_callback)
 # Don't forget to save the VecNormalize statistics when saving the agent
 model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
 env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
