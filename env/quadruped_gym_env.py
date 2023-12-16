@@ -207,7 +207,7 @@ class QuadrupedGymEnv(gym.Env):
     self.reset()
  
   def setupCPG(self):
-    self._cpg = HopfNetwork(use_RL=True)
+    self._cpg = HopfNetwork(use_RL=True,use_psi=True)
 
   ######################################################################################
   # RL Observation and Action spaces 
@@ -232,9 +232,12 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([1,1,1,1]),
                                          np.array([5,5,5,5]), #r
                                          np.array([2,2,2,2])*np.pi, #\theta
+                                         np.array([2,2,2,2])*np.pi, #\phi
                                          np.array([20,20,20,20]), #\rdot
                                          np.array([50,50,50,50]),#\thetadot
+                                         np.array([50,50,50,50]),#\phidot
                                          np.array([2]),
+                                         np.array([2 * np.pi]),
                                          np.array([1.0]*self._action_dim)))
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
@@ -247,8 +250,11 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([0,0,0,0]),
                                          np.array([0,0,0,0]), #r
                                          np.array([0,0,0,0]),#\theta
+                                         np.array([0,0,0,0]),#\phi
                                          np.array([-20,-20,-20,-20]), #\dot{r}
                                          np.array([-50,-50,-50,-50]),#dot{theta}
+                                         np.array([-50,-50,-50,-50]),#dot{phi}
+                                         np.array([0]),
                                          np.array([0]),
                                          np.array([-1.0]* self._action_dim)))
       observation_high = (upper_bound + OBSERVATION_EPS)
@@ -263,7 +269,10 @@ class QuadrupedGymEnv(gym.Env):
     if self._motor_control_mode in ["PD","TORQUE", "CARTESIAN_PD"]:
       action_dim = 12
     elif self._motor_control_mode in ["CPG"]:
-      action_dim = 8
+      if not self._cpg.use_psi:
+        action_dim = 8
+      elif self._cpg.use_psi:
+        action_dim = 12
     else:
       raise ValueError("motor control mode " + self._motor_control_mode + " not implemented yet.")
     action_high = np.array([1] * action_dim)
@@ -289,9 +298,12 @@ class QuadrupedGymEnv(gym.Env):
                                           self.robot.GetContactInfo()[3],
                                           self._cpg.X[0,:],
                                           self._cpg.X[1,:],
+                                          self._cpg.X[2,:],
                                           self._cpg.X_dot[0,:],
                                           self._cpg.X_dot[1,:],
+                                          self._cpg.X_dot[2,:],
                                           np.array([self._des_vel]),
+                                          np.array([self._des_yaw]),
                                           self._prev_action))
 
     else:
@@ -335,24 +347,30 @@ class QuadrupedGymEnv(gym.Env):
   def _reward_fwd_locomotion(self):
     """Learn forward locomotion at a desired velocity. """
     # track the desired velocity 
-    des_vel_x = self._des_vel
-    vel_tracking_reward = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2 )
+    des_vel = self._des_vel
+    des_phi = self._des_yaw
+    des_vel_x = des_vel * np.cos(des_phi)
+    des_vel_y = des_vel * np.sin(des_phi)
+    vel_tracking_reward_x = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
+    vel_tracking_reward_y = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
     # minimize yaw (go straight)
-    yaw_reward = -0.2 * np.abs(self.robot.GetBaseOrientationRollPitchYaw()[2]) 
+    yaw_reward = 0.02 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[2] - self._des_yaw)**2)
+    pitch_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[1])**2)
+    roll_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[0])**2)
     # don't drift laterally 
-    drift_reward_y = -0.01 * abs(self.robot.GetBasePosition()[1]) 
+    # drift_reward_y = -0.01 * abs(self.robot.GetBasePosition()[1]) 
     drift_reward_z = -0.01 * abs(self.robot.GetBasePosition()[2]) 
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
       energy_reward += np.abs(np.dot(tau,vel)) * self._time_step
 
-    reward = vel_tracking_reward \
+    reward = vel_tracking_reward_x \
+            + vel_tracking_reward_y \
             + yaw_reward \
-            + drift_reward_y \
             + drift_reward_z \
             - 0.01 * energy_reward \
-            - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
+            # - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
 
     return max(reward,0) # keep rewards positive
 
@@ -384,7 +402,7 @@ class QuadrupedGymEnv(gym.Env):
     # minimize distance to goal (we want to move towards the goal)
     dist_reward = 10 * ( self._prev_pos_to_goal - curr_dist_to_goal)
     # minimize yaw deviation to goal (necessary?)
-    yaw_reward = 0 # -0.01 * np.abs(angle) 
+    yaw_reward = -0.01 * np.abs(angle) 
 
     # minimize energy 
     energy_reward = 0 
@@ -477,15 +495,18 @@ class QuadrupedGymEnv(gym.Env):
     u = np.clip(actions,-1,1)
     self._prev_action = u
     # scale omega to ranges, and set in CPG (range is an example)
-    omega = self._scale_helper( u[0:4], 5, 4.5*2*np.pi)
+    omega = self._scale_helper( u[0:4], -50, 50)
     self._cpg.set_omega_rl(omega)
 
     # scale mu to ranges, and set in CPG (squared since we converge to the sqrt in the CPG amplitude)
     mus = self._scale_helper( u[4:8], MU_LOW**2, MU_UPP**2)
     self._cpg.set_mu_rl(mus)
 
+    if self._cpg.use_psi:
+      psi = self._scale_helper(u[8:12],-50,50)
+      self._cpg.set_psi_rl(psi)
     # integrate CPG, get mapping to foot positions
-    xs,ys, zs = self._cpg.update(use_psi = True)
+    xs,ys, zs = self._cpg.update()
 
     # IK parameters
     foot_y = self._robot_config.HIP_LINK_LENGTH
@@ -607,7 +628,14 @@ class QuadrupedGymEnv(gym.Env):
         if self._is_render:
           print('ground friction coefficient is', ground_mu_k)
       self._tot_time_step += 1
-      self._des_vel = 1 + (np.tanh((self._tot_time_step - 5e5)/15e4) * np.random.rand())
+      print("Total_time_step = ", self._tot_time_step)
+      # self._tot_time_step = 1e6
+      self._des_vel = 0.5#0.5 + ((np.tanh((self._tot_time_step - 1e3)/4e2)+1) * 0.5 * (np.random.rand()-0.5))
+      self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi/4 * (np.random.rand() - 0.5)
+      print("des_vel = ", self._des_vel)
+      print("des_yaw = ", self._des_yaw)
+      print("zero pitch =", self.robot.GetBaseOrientationRollPitchYaw()[1])
+      print("zero roll =", self.robot.GetBaseOrientationRollPitchYaw()[2])
       self._prev_action = np.zeros([self._action_dim,])
       if self._using_test_env:
         self.add_random_boxes()
@@ -643,7 +671,10 @@ class QuadrupedGymEnv(gym.Env):
         self._pybullet_client.removeBody(self.goal_id)
     except:
       pass
-    self._goal_location = 6 * (np.random.random((2,)) - 0.5) 
+    self._goal_location = np.zeros([2,])
+    complexity_level = np.tanh((self._tot_time_step - 5e5)/15e4)
+    self._goal_location[0] = (4 + 2 * complexity_level) * (np.random.random() - 0.5) 
+    self._goal_location[1] = (3 + 3 * complexity_level) * (np.random.random() - 0.5) 
     self._goal_location += self.robot.GetBasePosition()[0:2]
     sh_colBox = self._pybullet_client.createCollisionShape(self._pybullet_client.GEOM_BOX,
         halfExtents=[0.2,0.2,0.2])

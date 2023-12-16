@@ -67,7 +67,7 @@ else:
 
 if LOAD_NN:
     # interm_dir = cur_dir + "/logs/intermediate_models/"
-    log_dir = '/idiap/temp/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_1_12_08_15_54/'
+    log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_12_15_14_08/'
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -145,4 +145,4 @@ model.learn(total_timesteps=1000000, log_interval=1,callback=checkpoint_callback
 model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
 env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 
 if LEARNING_ALG == "SAC": # save replay buffer 
-    model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer"))
+    model.save_replay_buffer(os.path.join(SAVE_PATH,"off_policy_replay_buffer")) 
