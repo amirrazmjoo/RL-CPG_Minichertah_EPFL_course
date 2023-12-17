@@ -60,7 +60,7 @@ class HopfNetwork():
                 ground_penetration=0.01, # foot stance penetration into ground 
                 robot_height=0.3,        # in nominal case (standing) 
                 des_step_len=0.05,       # desired step length 
-                max_step_len_rl=0.05,     # max step length, for RL scaling 
+                max_step_len_rl=0.1,     # max step length, for RL scaling 
                 use_RL=False,
                 use_psi = False            # whether to learn parameters with RL 
                 ):
@@ -295,6 +295,10 @@ class HopfNetwork():
       r_ddot_i = a*(a/4*(self._mu_rl[i] - r) - r_dot)
       # phase (use omega from RL, i.e. self._omega_rl[i])
       theta_dot = self._omega_rl[i] # [TODO]
+
+      for j in range(4):
+        theta_dot += self.get_r()[j]*self._coupling_strength*np.sin(self.get_theta()[j] - theta - self.PHI[i,j]) # [TODO]
+
       # Orientation
       phi_dot = self.psi_rl[i]
 
