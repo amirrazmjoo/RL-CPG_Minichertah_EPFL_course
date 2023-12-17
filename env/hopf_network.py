@@ -296,8 +296,8 @@ class HopfNetwork():
       # phase (use omega from RL, i.e. self._omega_rl[i])
       theta_dot = self._omega_rl[i] # [TODO]
 
-      for j in range(4):
-        theta_dot += self.get_r()[j]*self._coupling_strength*np.sin(self.get_theta()[j] - theta - self.PHI[i,j]) # [TODO]
+      # for j in range(4):
+      #   theta_dot += self.get_r()[j]*self._coupling_strength*np.sin(self.get_theta()[j] - theta - self.PHI[i,j]) # [TODO]
 
       # Orientation
       phi_dot = self.psi_rl[i]
