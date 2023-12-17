@@ -351,8 +351,8 @@ class QuadrupedGymEnv(gym.Env):
     des_phi = self._des_yaw
     des_vel_x = des_vel * np.cos(des_phi)
     des_vel_y = des_vel * np.sin(des_phi)
-    vel_tracking_reward_x = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
-    vel_tracking_reward_y = 0.05 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
+    vel_tracking_reward_x = 0.5 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
+    vel_tracking_reward_y = 0.5 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
     # minimize yaw (go straight)
     yaw_reward = 0.02 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[2] - self._des_yaw)**2)
     pitch_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[1])**2)
@@ -630,7 +630,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.5#0.5 + ((np.tanh((self._tot_time_step - 1e3)/4e2)+1) * 0.5 * (np.random.rand()-0.5))
+      self._des_vel = 1#0.5 + ((np.tanh((self._tot_time_step - 1e3)/4e2)+1) * 0.5 * (np.random.rand()-0.5))
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi/4 * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
