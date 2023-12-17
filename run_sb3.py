@@ -46,7 +46,7 @@ from env.quadruped_gym_env import QuadrupedGymEnv
 
 
 LEARNING_ALG = "PPO" # or "SAC"
-LOAD_NN = False # if you want to initialize training with a previous model 
+LOAD_NN = True # if you want to initialize training with a previous model 
 NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
@@ -56,8 +56,8 @@ USE_GPU = True # make sure to install all necessary drivers
 #                "task_env": "FLAGRUN", #  "LR_COURSE_TASK",
 #                "observation_space_mode": "LR_COURSE_OBS"}
 env_configs = {"motor_control_mode":"CPG_PSI",
-               "task_env":"LOCOMOTION_CPG",
-               "observation_space_mode":"CPG_PSI"}
+               "task_env":"FLAGRUN",
+               "observation_space_mode":"LR_COURSE_OBS"}
 
 if USE_GPU and LEARNING_ALG=="SAC":
     gpu_arg = "auto" 
@@ -66,7 +66,7 @@ else:
 
 if LOAD_NN:
     interm_dir = "./logs/intermediate_models/"
-    log_dir = interm_dir + '120623174616' # add path
+    log_dir = interm_dir + '121623114510' # add path
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -84,12 +84,12 @@ env = make_vec_env(env, monitor_dir=SAVE_PATH,n_envs=NUM_ENVS)
 env = VecNormalize(env, norm_obs=True, norm_reward=False, clip_obs=100.)
 
 if LOAD_NN:
-    env = lambda: QuadrupedGymEnv()
+    env = lambda: QuadrupedGymEnv(**env_configs)
     env = make_vec_env(env, n_envs=NUM_ENVS, monitor_dir=SAVE_PATH)
     env = VecNormalize.load(stats_path, env)
 
 # Multi-layer perceptron (MLP) policy of two layers of size _,_ 
-policy_kwargs = dict(net_arch=[128,256])
+policy_kwargs = dict(net_arch=[256,128])
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
 n_steps = 10240 
 learning_rate = lambda f: 5e-4

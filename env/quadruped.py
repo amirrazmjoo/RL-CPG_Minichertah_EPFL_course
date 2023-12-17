@@ -37,6 +37,7 @@ import time
 import re
 import quadruped_motor
 
+
 class Quadruped(object):
   """The quadruped class to simulate a quadruped robot.
   """
@@ -47,7 +48,8 @@ class Quadruped(object):
                accurate_motor_model_enabled=True,
                motor_control_mode="PD",
                on_rack=False,
-               render=False):
+               render=False,
+               random_orientation=False):
     """Construct a quadruped and reset it to the initial states.
 
     Args:
@@ -72,6 +74,7 @@ class Quadruped(object):
     self._observed_motor_torques = np.zeros(self.num_motors)
     self._applied_motor_torques = np.zeros(self.num_motors)
     self._accurate_motor_model_enabled = accurate_motor_model_enabled
+    self._random_orientation = random_orientation
 
     # motor control mode for accurate motor model, should only be torque or position at this low level
     if motor_control_mode == "PD":
@@ -111,6 +114,8 @@ class Quadruped(object):
       return self._robot_config.INIT_POSITION
 
   def _GetDefaultInitOrientation(self):
+    if self._random_orientation:
+      return self._pybullet_client.getQuaternionFromEuler([0,0,np.random.uniform(-np.pi, np.pi, size=1)])
     return self._robot_config.INIT_ORIENTATION
 
   def GetBasePosition(self):

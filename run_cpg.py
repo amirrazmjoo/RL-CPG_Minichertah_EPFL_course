@@ -66,7 +66,7 @@ omega_stance = 2*2*np.pi
 omega_swing = 5*2*np.pi
 cpg = HopfNetwork(time_step=TIME_STEP, omega_stance=omega_stance, omega_swing=omega_swing)
 
-TEST_STEPS = int(5 / (TIME_STEP))
+TEST_STEPS = int(2 / (TIME_STEP))
 t = np.arange(TEST_STEPS)*TIME_STEP
 
 # [TODO] initialize data structures to save CPG and robot states
@@ -78,6 +78,8 @@ des_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
 real_joint_pos_hist = np.zeros((4, 3, TEST_STEPS))
 real_joint_vel_hist = np.zeros((4, 3, TEST_STEPS))
 normal_force_hist = np.zeros((4, TEST_STEPS))
+body_vel_hist = np.zeros((3,TEST_STEPS))
+foot_contact_hist = np.zeros((4,TEST_STEPS))
 
 ############## Sample Gains
 # joint PD gains
@@ -123,6 +125,8 @@ for j in range(TEST_STEPS):
       # Calculate torque contribution from Cartesian PD (Equation 5) [Make sure you are using matrix multiplications]
       tau += J.T @ (kpCartesian @ (leg_xyz - foot_pos) + kdCartesian @ (-foot_vel)) # [TODO]
 
+
+
     # Set tau for legi in action vector
     action[3*i:3*i+3] = tau
 
@@ -132,8 +136,10 @@ for j in range(TEST_STEPS):
     des_joint_pos_hist[i,:,j] = leg_q
     # Get real pos
     real_foot_pos_hist[i,:,j] = foot_pos[[0,2]]
+    body_vel_hist[:,j] = env.robot.GetBaseLinearVelocity()
 
     normal_force_hist[:,j] = env.robot.GetContactInfo()[2]
+    foot_contact_hist[:,j] = env.robot.GetContactInfo()[3]
 
     #time.sleep(0.001)
 
@@ -212,6 +218,20 @@ for i in range(4):
   ax5.plot(normal_force_hist[i,:])
 ax5.legend([f'Foot {k}' for k in range(1,5)])
 
+fig6, ax6 = plt.subplots(2,2, sharey=True)
+fig6.suptitle('Foot vs body vel')
+ax6[0,0].set_ylabel('m/s')
+ax6[0,1].set_xlabel('Timesteps')
+ax6[0,0].set_title('y')
+ax6[0,1].set_title('x')
+ax6[1,1].set_title('z')
+
+for i in range(3):
+  ax6[order_indices[i]].plot(foot_vel_hist[0,i,:])
+  ax6[order_indices[i]].plot(body_vel_hist[i,:])
+  ax6[order_indices[i]].plot(foot_vel_hist[0,i,:] - body_vel_hist[i,:])
+  ax6[order_indices[i]].plot(foot_contact_hist[0,:])
+  ax6[order_indices[i]].legend(['Foot', 'Base', 'Diff', 'Contact'])
 
 plt.show()
 

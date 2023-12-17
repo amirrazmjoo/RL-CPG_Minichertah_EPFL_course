@@ -55,18 +55,20 @@ from utils.utils import plot_results
 from utils.file_utils import get_latest_model, load_all_results
 
 
-LEARNING_ALG = "SAC"
+LEARNING_ALG = "PPO"
 interm_dir = "./logs/intermediate_models/"
 # path to saved models, i.e. interm_dir + '121321105810'
-log_dir = interm_dir + '112623084229'
+log_dir = interm_dir + '121723032126'
 
 # initialize env configs (render at test time)
 # check ideal conditions, as well as robustness to UNSEEN noise during training
 env_config = {"motor_control_mode":"CPG_PSI",
-              "task_env":"LOCOMOTION_CPG"}
+               "task_env":"FLAGRUN",
+               "observation_space_mode":"LR_COURSE_OBS",
+               "test_env": False}
 env_config['render'] = True
 env_config['record_video'] = False
-env_config['add_noise'] = True 
+env_config['add_noise'] = False 
 #env_config['competition_env'] = True
 
 # get latest model and normalization stats, and plot 
@@ -94,14 +96,14 @@ print("\nLoaded model", model_name, "\n")
 obs = env.reset()
 episode_reward = 0
 
-NUM_STEPS = 2000
+NUM_STEPS = 1000
 
 # [TODO] initialize arrays to save data from simulation 
 cpg_states_hist = np.zeros((4, 6, NUM_STEPS))
 foot_pos_hist = np.zeros((4, 3, NUM_STEPS))
 joint_pos_hist = np.zeros((4, 3, NUM_STEPS))
 joint_vel_hist = np.zeros((4, 3, NUM_STEPS))
-body_pose_hist = []
+body_pose_hist = np.zeros((3,NUM_STEPS))
 current_body_pose_hist = []
 body_vel_hist = np.zeros((3, NUM_STEPS))
 body_ang_vel_hist = np.zeros((3, NUM_STEPS))
@@ -116,8 +118,6 @@ for i in range(NUM_STEPS):
         print('episode_reward', episode_reward)
         print('Final base position', info[0]['base_pos'])
         episode_reward = 0
-        body_pose_hist.append(current_body_pose_hist.copy())
-        current_body_pose_hist = []
 
     # [TODO] save data from current robot states for plots 
     # To get base position, for example: env.envs[0].env.robot.GetBasePosition() 
@@ -130,7 +130,7 @@ for i in range(NUM_STEPS):
 
     
     # Get body data
-    current_body_pose_hist.append(env.envs[0].env.robot.GetBasePosition())
+    body_pose_hist[:,i] = env.envs[0].env.robot.GetBasePosition()
     body_vel_hist[:,i] = env.envs[0].env.robot.GetBaseLinearVelocity()
     body_ang_vel_hist[:,i] = env.envs[0].env.robot.GetBaseAngularVelocity()
     body_ort_hist[:,i] = env.envs[0].env.robot.GetBaseOrientationRollPitchYaw()
@@ -158,7 +158,7 @@ ax1[order_indices[1]].set_ylabel("z")
 
 # CPG parameters
 begin_range = 0
-plot_range = 300
+plot_range = 500
 fig2, ax2 = plt.subplots(2,2, sharey=True)
 fig2.suptitle("CPG parameters")
 for i in range(4):
@@ -194,10 +194,11 @@ ax3[0,1].set_ylabel('Angular velocity (rad/s)')
 ax3[0,1].legend([r'$\dot{\phi}$', r'$\dot{\theta}$', r'$\dot{\psi}$'])
 
 legend = []
-for i in range(len(body_pose_hist)):
-    b_pos = np.array(body_pose_hist[i])
-    ax3[1,0].plot(b_pos[0,:], b_pos[1,:])
-    legend.append(f'run_{i+1}')
+#for i in range(len(body_pose_hist)):
+#    b_pos = np.array(body_pose_hist[i])
+#    ax3[1,0].plot(b_pos[0,:], b_pos[1,:])
+#    legend.append(f'run_{i+1}')
+ax3[1,0].plot(body_pose_hist[0,:], body_pose_hist[1,:])
 ax3[1,0].set_xlabel('x')
 ax3[1,0].set_ylabel('y')
 ax3[1,0].legend(legend)
