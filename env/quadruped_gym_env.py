@@ -197,6 +197,13 @@ class QuadrupedGymEnv(gym.Env):
     self._total_timesteps = 0
     self._des_vel = 0.5
     self._des_dyaw = 0
+    self._last_obs = None
+    self._obs_len = 0
+    self.reward_hist = {
+      "dist_to_goal": [],
+      "angle_to_goal": [],
+      "angle_rate_to_goal": []
+    }
 
     # if using CPG
     self.setupCPG()
@@ -258,7 +265,6 @@ class QuadrupedGymEnv(gym.Env):
                                                          [np.pi/2]*4, # phi MAX
                                                          [1.5*2*np.pi]*4
                                                          )), # dphi MAX 
-                                          np.array([1]*self._action_dim), # Prev action
                                           np.array([4, 0.5]))) +  OBSERVATION_EPS) # des_vel, des_dyaw
       observation_low = (np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
                                          -self._robot_config.VELOCITY_LIMITS,
@@ -274,7 +280,6 @@ class QuadrupedGymEnv(gym.Env):
                                                          [-20]*4,         # dr MIN
                                                          [-np.pi/2]*4,  # phi MIN
                                                          [-1.5*2*np.pi]*4)), # dphi MIN
-                                          np.array([-1]*self._action_dim),# Prev action
                                           np.array([0, -0.5]))) -  OBSERVATION_EPS)  # des_vel, des_dyaw
     elif self._observation_space_mode == "CPG":
       observation_high = (np.concatenate((self._robot_config.UPPER_ANGLE_JOINT,
@@ -310,35 +315,37 @@ class QuadrupedGymEnv(gym.Env):
       observation_high = (np.concatenate((self._robot_config.UPPER_ANGLE_JOINT,
                                          self._robot_config.VELOCITY_LIMITS,
                                          self._robot_config.TORQUE_LIMITS,
-                                         np.array([2.5]*3), # Max Velocity of body
-                                         np.array([5]*3), # Max angular velocity
+                                         np.array([4]*3), # Max Velocity of body
+                                         np.array([10]*3), # Max angular velocity
                                          np.array([1]), # Body height
                                          np.array([1]*4), #Contact booleans
                                          np.array([1.0]*4), # Orientation
                                          np.concatenate(([2*np.pi]*4,     # theta MAX
                                                          [5]*4,           # r MAX
                                                          [20]*4, # dr MAX
-                                                         [np.pi/2]*4)), # phi MAX 
+                                                         [np.pi]*4)), # phi MAX 
                                           np.array([1]*self._action_dim), # Prev action
                                           np.array([1]*2),
                                           np.array([10]))) +  OBSERVATION_EPS) # des_vel, des_dyaw
       observation_low = (np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
                                          -self._robot_config.VELOCITY_LIMITS,
                                          -self._robot_config.TORQUE_LIMITS,
-                                         np.array([-2.5]*3),# Min Velocity of body
-                                         np.array([-5]*3), # Max angular velocity
+                                         np.array([-4]*3),# Min Velocity of body
+                                         np.array([-10]*3), # Max angular velocity
                                          np.array([0]),  # Body height
                                          np.array([0]*4), #Contact booleans,
                                          np.array([-1.0]*4), # Orientation
                                          np.concatenate(([0]*4,           # theta MIN
                                                          [0]*4,           # r MIN
                                                          [-20]*4,         # dr MIN
-                                                         [-np.pi/2]*4)), # phi MIN
+                                                         [-np.pi]*4)), # phi MIN
                                           np.array([-1]*self._action_dim),# Prev action
                                           np.array([-1]*2), # Goal heading unit vetor
                                           np.array([0]))) -  OBSERVATION_EPS)  # Distance to goal
     else:
       raise ValueError("observation space not defined or not intended")
+    
+    self._obs_len = observation_high.shape[0]
 
     self.observation_space = spaces.Box(observation_low, observation_high, dtype=np.float32)
 
@@ -392,7 +399,6 @@ class QuadrupedGymEnv(gym.Env):
                                                           self._cpg.get_dr(),
                                                           self._cpg.get_phi(),
                                                           self._cpg.get_dphi())),
-                                          self._last_action,
                                           np.array([self._des_vel, self._des_dyaw])))
     elif self._observation_space_mode == "CPG":
       self._observation = np.concatenate((self.robot.GetMotorAngles(), 
@@ -416,6 +422,8 @@ class QuadrupedGymEnv(gym.Env):
       vec_to_goal = self._goal_location - self.robot.GetBasePosition()[:2]
       dist_to_goal = np.linalg.norm(vec_to_goal)
       vec_to_goal = vec_to_goal / dist_to_goal
+      if self._last_obs is None:
+        self._last_obs = np.zeros(self._obs_len)
       self._observation = np.concatenate((self.robot.GetMotorAngles(), 
                                     self.robot.GetMotorVelocities(),
                                     self.robot.GetMotorTorques(),
@@ -590,10 +598,16 @@ class QuadrupedGymEnv(gym.Env):
     reward_psi = 0.5 * np.exp(-np.linalg.norm(current_u[8:]))
 
     # minimize distance to goal (we want to move towards the goal)
-    dist_reward = 10 * ( self._prev_pos_to_goal - curr_dist_to_goal)
+    #dist_reward = 5 * ( self._prev_pos_to_goal - curr_dist_to_goal)
+    dist_reward = 0.5 * np.exp(-curr_dist_to_goal/2)
+    self.reward_hist['dist_to_goal'].append(dist_reward)
     # minimize yaw deviation to goal (not at the beginning)
-    yaw_reward = -0.05 * np.abs(angle)
+    yaw_reward = -0.05 * np.exp(-np.abs(angle)/np.pi)
+    self.reward_hist['angle_to_goal'].append(yaw_reward)
     #print(f'Angle to goal: {angle*180/np.pi}')
+
+    orientation_reward = 10 * (abs(angle) - abs(self._prev_angle_to_goal))
+    self.reward_hist['angle_rate_to_goal'].append(orientation_reward)
 
     # Survival reward (@ beginning)
     #survival_reward = 0.01 * self._time_step * (1-k_l)
@@ -605,7 +619,7 @@ class QuadrupedGymEnv(gym.Env):
     #print(f'Velocity z: {roll_pitch_reward}')
 
     # Smooth action reward
-    smooth_action_reward = -0.05 * np.linalg.norm(current_u - self._last_action)**2
+    #smooth_action_reward = -0.05 * np.linalg.norm(current_u - self._last_action)**2
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
@@ -764,11 +778,12 @@ class QuadrupedGymEnv(gym.Env):
   def step(self, action):
     """ Step forward the simulation, given the action. """
     curr_act = action.copy()
+    self._last_obs = self._get_observation()[self._obs_len:]
     # save motor torques and velocities to compute power in reward function
     self._dt_motor_torques = []
     self._dt_motor_velocities = []
     if "FLAGRUN" in self._TASK_ENV:
-      self._prev_pos_to_goal, _ = self.get_distance_and_angle_to_goal()
+      self._prev_pos_to_goal, self._prev_angle_to_goal = self.get_distance_and_angle_to_goal()
     
     for _ in range(self._action_repeat):
       if self._isRLGymInterface: 
@@ -887,9 +902,10 @@ class QuadrupedGymEnv(gym.Env):
         self._pybullet_client.removeBody(self.goal_id)
     except:
       pass
-    c_factor = max(0, 200000 - self._total_timesteps)
-    self._goal_location = 6 * np.array([np.random.rand() - np.exp(-c_factor/50000)*0.5, np.exp(-c_factor/50000)*(np.random.rand() - 0.5)])
-    #self._goal_location = np.array([6*np.exp(-c_factor/50000)*np.random.rand() + 2,0])
+    c_factor = max(0, 500000 - self._total_timesteps)
+    #self._goal_location = 6 * np.array([np.random.rand() - np.exp(-c_factor/50000)*0.5, np.exp(-c_factor/50000)*(np.random.rand() - 0.5)])
+    r_angle = self.robot.GetBaseOrientationRollPitchYaw()[2]
+    self._goal_location = 3*np.array([np.cos(r_angle), np.sin(r_angle)])
     self._goal_location += self.robot.GetBasePosition()[0:2]
     print(f'GOAL LOCATION: {self._goal_location}')
     sh_colBox = self._pybullet_client.createCollisionShape(self._pybullet_client.GEOM_BOX,

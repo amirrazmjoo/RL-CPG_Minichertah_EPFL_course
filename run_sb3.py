@@ -43,10 +43,11 @@ from utils.utils import CheckpointCallback
 from utils.file_utils import get_latest_model
 # gym environment
 from env.quadruped_gym_env import QuadrupedGymEnv
+from typing import Callable
 
 
 LEARNING_ALG = "PPO" # or "SAC"
-LOAD_NN = True # if you want to initialize training with a previous model 
+LOAD_NN = False # if you want to initialize training with a previous model 
 NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
@@ -66,7 +67,7 @@ else:
 
 if LOAD_NN:
     interm_dir = "./logs/intermediate_models/"
-    log_dir = interm_dir + '121623114510' # add path
+    log_dir = interm_dir + '122823142930' # add path
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -89,10 +90,50 @@ if LOAD_NN:
     env = VecNormalize.load(stats_path, env)
 
 # Multi-layer perceptron (MLP) policy of two layers of size _,_ 
-policy_kwargs = dict(net_arch=[256,128])
+policy_kwargs = dict(net_arch=[256,256])
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
-n_steps = 10240 
-learning_rate = lambda f: 5e-4
+n_steps = 6144 
+
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return max(1e-4, progress_remaining * initial_value)
+
+    return func
+
+def clipping_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return max(0.01, progress_remaining * initial_value)
+
+    return func
+
+learning_rate = linear_schedule(1e-3)#
+clipping_rate = 0.2#clipping_schedule(0.3)
 ppo_config = {  "gamma":0.99, 
                 "n_steps": int(n_steps/NUM_ENVS), 
                 "ent_coef":0.01, 
@@ -100,9 +141,9 @@ ppo_config = {  "gamma":0.99,
                 "vf_coef":0.5,
                 "max_grad_norm":0.5, 
                 "gae_lambda":0.95, 
-                "batch_size":512,
+                "batch_size":1024,
                 "n_epochs":10, 
-                "clip_range":0.2, 
+                "clip_range":clipping_rate, 
                 "clip_range_vf":1,
                 "verbose":1, 
                 "tensorboard_log":'./logs/a1_ppo_tensorboard', 
@@ -141,7 +182,7 @@ if LOAD_NN:
     print("\nLoaded model", model_name, "\n")
 
 # Learn and save (may need to train for longer)
-model.learn(total_timesteps=1500000, log_interval=1,callback=checkpoint_callback)
+model.learn(total_timesteps=1000000, log_interval=1,callback=checkpoint_callback)
 # Don't forget to save the VecNormalize statistics when saving the agent
 model.save( os.path.join(SAVE_PATH, "rl_model" ) ) 
 env.save(os.path.join(SAVE_PATH, "vec_normalize.pkl" )) 

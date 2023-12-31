@@ -58,17 +58,18 @@ from utils.file_utils import get_latest_model, load_all_results
 LEARNING_ALG = "PPO"
 interm_dir = "./logs/intermediate_models/"
 # path to saved models, i.e. interm_dir + '121321105810'
-log_dir = interm_dir + '121723032126'
+log_dir = interm_dir + '123123045152'
 
 # initialize env configs (render at test time)
 # check ideal conditions, as well as robustness to UNSEEN noise during training
 env_config = {"motor_control_mode":"CPG_PSI",
                "task_env":"FLAGRUN",
                "observation_space_mode":"LR_COURSE_OBS",
-               "test_env": False}
+               "test_env": False,
+               "competition_env": False}
 env_config['render'] = True
 env_config['record_video'] = False
-env_config['add_noise'] = False 
+env_config['add_noise'] = True 
 #env_config['competition_env'] = True
 
 # get latest model and normalization stats, and plot 
@@ -96,7 +97,7 @@ print("\nLoaded model", model_name, "\n")
 obs = env.reset()
 episode_reward = 0
 
-NUM_STEPS = 1000
+NUM_STEPS = 500
 
 # [TODO] initialize arrays to save data from simulation 
 cpg_states_hist = np.zeros((4, 6, NUM_STEPS))
@@ -158,7 +159,7 @@ ax1[order_indices[1]].set_ylabel("z")
 
 # CPG parameters
 begin_range = 0
-plot_range = 500
+plot_range = 100
 fig2, ax2 = plt.subplots(2,2, sharey=True)
 fig2.suptitle("CPG parameters")
 for i in range(4):
@@ -222,5 +223,14 @@ for i in range(4):
     ax4[1].plot(cpg_states_hist[i,5,begin_range:begin_range+plot_range])
 ax4[0].legend([f'Leg {i}' for i in range(1,5)])
 ax4[1].legend([f'Leg {i}' for i in range(1,5)])
+
+# Rewards
+fig4, ax4 = plt.subplots(1,1)
+fig4.suptitle(r'Reward history by types')
+ax4.set_ylabel(r'reward')
+ax4.set_xlabel('Timesteps')
+for v in env.envs[0].env.reward_hist.values():    
+    ax4.plot(v)
+ax4.legend([f'{i}' for i in env.envs[0].env.reward_hist.keys()])
 
 plt.show()
