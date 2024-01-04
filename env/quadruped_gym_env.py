@@ -306,7 +306,7 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X_dot[1,:],
                                           self._cpg.X_dot[2,:],
                                           np.array([self._des_vel]),
-                                          np.array([yaw_command]),
+                                          np.array([self._des_yaw]),
                                           self._prev_action))
 
     else:
@@ -362,7 +362,7 @@ class QuadrupedGymEnv(gym.Env):
     roll_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[0])**2)
     # don't drift laterally 
     # drift_reward_y = -0.01 * abs(self.robot.GetBasePosition()[1]) 
-    drift_reward_z = -0.01 * abs(self.robot.GetBasePosition()[2]) 
+    drift_reward_z = -0.1 * abs(self.robot.GetBasePosition()[2]) 
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
