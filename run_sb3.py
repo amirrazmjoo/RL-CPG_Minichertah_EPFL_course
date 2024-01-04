@@ -34,6 +34,7 @@ Check the documentation! https://stable-baselines3.readthedocs.io/en/master/
 """
 import os
 from datetime import datetime
+from typing import Callable
 # stable baselines 3
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from stable_baselines3 import PPO, SAC
@@ -67,7 +68,7 @@ else:
 
 if LOAD_NN:
     # interm_dir = cur_dir + "/logs/intermediate_models/"
-    log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_12_15_14_08/'
+    log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_12_18_19_04/'
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -91,7 +92,29 @@ if LOAD_NN:
 policy_kwargs = dict(activation_fn=torch.nn.ELU,net_arch=[512,256,128])
 # What are these hyperparameters? Check here: https://stable-baselines3.readthedocs.io/en/master/modules/ppo.html
 n_steps = 4096 
-learning_rate = lambda f: 1e-4 
+
+def linear_schedule(initial_value: float) -> Callable[[float], float]:
+    """
+    Linear learning rate schedule.
+
+    :param initial_value: Initial learning rate.
+    :return: schedule that computes
+      current learning rate depending on remaining progress
+    """
+    def func(progress_remaining: float) -> float:
+        """
+        Progress will decrease from 1 (beginning) to 0.
+
+        :param progress_remaining:
+        :return: current learning rate
+        """
+        return progress_remaining * initial_value
+
+    return func
+
+learning_rate = linear_schedule(0.0002) 
+
+# learning_rate = lambda f: 1e-4 
 ppo_config = {  "gamma":0.99, 
                 "n_steps": int(n_steps/NUM_ENVS), 
                 "ent_coef":0.0, 
