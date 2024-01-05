@@ -361,7 +361,7 @@ class QuadrupedGymEnv(gym.Env):
     pitch_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[1])**2)
     roll_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[0])**2)
     # don't drift laterally 
-    drift_reward_x = -0.1 * abs(self.robot.GetBasePosition()[0]) 
+    drift_reward_x = 0 * abs(self.robot.GetBasePosition()[0]) 
     drift_reward_y = -0.1 * abs(self.robot.GetBasePosition()[1]) 
     drift_reward_z = -0.1 * abs(self.robot.GetBasePosition()[2]) 
     # minimize energy 
@@ -636,7 +636,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0#0.5 + ((np.tanh((self._tot_time_step - 1e3)/4e2)+1) * 0.5 * (np.random.rand()-0.5))
+      self._des_vel = 0.25 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
