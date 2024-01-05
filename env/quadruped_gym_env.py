@@ -375,7 +375,7 @@ class QuadrupedGymEnv(gym.Env):
             + drift_reward_x\
             + drift_reward_y \
             + drift_reward_z \
-            - 0.01 * energy_reward \
+            - 0.1 * energy_reward \
             # - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
 
     return max(reward,0) # keep rewards positive
