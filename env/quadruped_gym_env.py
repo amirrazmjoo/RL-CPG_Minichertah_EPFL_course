@@ -238,6 +238,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([50,50,50,50]),#\phidot
                                          np.array([2]),#\des_vel
                                          np.array([np.pi]), # Des rotation
+                                         np.array([2 * np.pi]*4), #diff steering
                                          np.array([1.0]*self._action_dim)))#Prev normalized action
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
@@ -256,6 +257,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([-50,-50,-50,-50]),#dot{phi}
                                          np.array([0]),#Des vel
                                          np.array([-np.pi]), #Des rotation
+                                         np.array([-2 * np.pi]*4), #diff steering
                                          np.array([-1.0]* self._action_dim)))#Prev normalized action
       observation_high = (upper_bound + OBSERVATION_EPS)
       observation_low = (lower_bound -  OBSERVATION_EPS)
@@ -290,7 +292,9 @@ class QuadrupedGymEnv(gym.Env):
     elif self._observation_space_mode == "LR_COURSE_OBS":
       robot_yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
       diff = self._des_yaw - robot_yaw
-      yaw_command = np.clip(diff,-np.pi/4,np.pi/4) 
+      yaw_command = np.clip(diff,-np.pi,np.pi) 
+      psi_each_leg = np.arctan2(np.sin(self._cpg.X[2,:]),np.cos(self._cpg.X[2,:]))
+      diff_each_leg = yaw_command - psi_each_leg
       self._observation = np.concatenate((self.robot.GetMotorAngles(), 
                                           self.robot.GetMotorVelocities(),
                                           np.array([self.robot.GetBasePosition()[2]]),
@@ -307,6 +311,7 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X_dot[2,:],
                                           np.array([self._des_vel]),
                                           np.array([self._des_yaw]),
+                                          diff_each_leg,
                                           self._prev_action))
 
     else:
@@ -354,15 +359,13 @@ class QuadrupedGymEnv(gym.Env):
     des_phi = self._des_yaw
     des_vel_x = des_vel * np.cos(des_phi)
     des_vel_y = des_vel * np.sin(des_phi)
-    vel_tracking_reward_x = 0.3 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
-    vel_tracking_reward_y = 0.3 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
+    vel_tracking_reward_x = 1 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
+    vel_tracking_reward_y = 1 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
     # minimize yaw (go straight)
     yaw_reward = 0.02 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[2] - self._des_yaw)**2)
     pitch_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[1])**2)
     roll_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[0])**2)
     # don't drift laterally 
-    drift_reward_x = 0 * abs(self.robot.GetBasePosition()[0]) 
-    drift_reward_y = -0.1 * abs(self.robot.GetBasePosition()[1]) 
     drift_reward_z = -0.1 * abs(self.robot.GetBasePosition()[2]) 
     # minimize energy 
     energy_reward = 0 
@@ -372,8 +375,6 @@ class QuadrupedGymEnv(gym.Env):
     reward = vel_tracking_reward_x \
             + vel_tracking_reward_y \
             + yaw_reward \
-            + drift_reward_x\
-            + drift_reward_y \
             + drift_reward_z \
             - 0.01 * energy_reward \
             # - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
@@ -636,7 +637,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.75 * (np.tanh((self._tot_time_step - 2e2)/1e2)+1)
+      self._des_vel = 0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
