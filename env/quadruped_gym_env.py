@@ -375,7 +375,7 @@ class QuadrupedGymEnv(gym.Env):
             + drift_reward_x\
             + drift_reward_y \
             + drift_reward_z \
-            - 0.1 * energy_reward \
+            - 0.01 * energy_reward \
             # - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
 
     return max(reward,0) # keep rewards positive
@@ -636,7 +636,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.25 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
+      self._des_vel = 0.75 * (np.tanh((self._tot_time_step - 2e2)/1e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
