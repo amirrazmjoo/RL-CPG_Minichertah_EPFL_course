@@ -98,7 +98,7 @@ VIDEO_LOG_DIRECTORY = 'videos/' + datetime.datetime.now().strftime("vid-%Y-%m-%d
 #         torques are computed based on inverse kinematics + joint PD (or you can add Cartesian PD)
 
 
-EPISODE_LENGTH = 10   # how long before we reset the environment (max episode length for RL)
+EPISODE_LENGTH = 1000   # how long before we reset the environment (max episode length for RL)
 MAX_FWD_VELOCITY = 1  # to avoid exploiting simulator dynamics, cap max reward for body velocity 
 
 # CPG quantities
@@ -637,7 +637,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
+      self._des_vel = 1#0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
