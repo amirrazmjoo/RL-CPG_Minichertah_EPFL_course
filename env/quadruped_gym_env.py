@@ -238,6 +238,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([50,50,50,50]),#\phidot
                                          np.array([2]),#\des_vel
                                          np.array([np.pi]), # Des rotation
+                                         np.array([2 * np.pi]*4), #diff steering
                                          np.array([1.0]*self._action_dim)))#Prev normalized action
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
@@ -256,6 +257,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([-50,-50,-50,-50]),#dot{phi}
                                          np.array([0]),#Des vel
                                          np.array([-np.pi]), #Des rotation
+                                         np.array([-2 * np.pi]*4), #diff steering
                                          np.array([-1.0]* self._action_dim)))#Prev normalized action
       observation_high = (upper_bound + OBSERVATION_EPS)
       observation_low = (lower_bound -  OBSERVATION_EPS)
@@ -290,7 +292,9 @@ class QuadrupedGymEnv(gym.Env):
     elif self._observation_space_mode == "LR_COURSE_OBS":
       robot_yaw = self.robot.GetBaseOrientationRollPitchYaw()[2]
       diff = self._des_yaw - robot_yaw
-      yaw_command = np.clip(diff,-np.pi/4,np.pi/4) 
+      yaw_command = np.clip(diff,-np.pi,np.pi) 
+      psi_each_leg = np.arctan2(np.sin(self.X[2,:]),np.cos(self.X[2,:]))
+      diff_each_leg = yaw_command - psi_each_leg
       self._observation = np.concatenate((self.robot.GetMotorAngles(), 
                                           self.robot.GetMotorVelocities(),
                                           np.array([self.robot.GetBasePosition()[2]]),
@@ -307,6 +311,7 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X_dot[2,:],
                                           np.array([self._des_vel]),
                                           np.array([self._des_yaw]),
+                                          diff_each_leg,
                                           self._prev_action))
 
     else:
@@ -636,7 +641,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.25 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
+      self._des_vel = 1.5#0.25 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
