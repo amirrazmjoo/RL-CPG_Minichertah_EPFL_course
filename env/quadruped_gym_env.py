@@ -98,7 +98,7 @@ VIDEO_LOG_DIRECTORY = 'videos/' + datetime.datetime.now().strftime("vid-%Y-%m-%d
 #         torques are computed based on inverse kinematics + joint PD (or you can add Cartesian PD)
 
 
-EPISODE_LENGTH = 1000   # how long before we reset the environment (max episode length for RL)
+EPISODE_LENGTH = 10   # how long before we reset the environment (max episode length for RL)
 MAX_FWD_VELOCITY = 1  # to avoid exploiting simulator dynamics, cap max reward for body velocity 
 
 # CPG quantities
@@ -356,14 +356,15 @@ class QuadrupedGymEnv(gym.Env):
     des_phi = self._des_yaw
     des_vel_x = des_vel * np.cos(des_phi)
     des_vel_y = des_vel * np.sin(des_phi)
-    vel_tracking_reward_x = 1 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
-    vel_tracking_reward_y = 1 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
+    vel_tracking_reward_x = 0.5 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[0] - des_vel_x)**2)
+    vel_tracking_reward_y = 0.5 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[1] - des_vel_y)**2)
+    drift_reward_z = 0.1 * np.exp( -1/ 0.25 *  (self.robot.GetBaseLinearVelocity()[2])**2)
     # minimize yaw (go straight)
     yaw_reward = 0.02 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[2] - self._des_yaw)**2)
     pitch_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[1])**2)
     roll_reward = 0.01 * np.exp( -1/ 0.25 *  (self.robot.GetBaseOrientationRollPitchYaw()[0])**2)
     # don't drift laterally 
-    drift_reward_z = -0.1 * abs(self.robot.GetBasePosition()[2]) 
+    drift_reward_y = -0.1 * abs(self.robot.GetBasePosition()[1]) 
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
@@ -373,6 +374,7 @@ class QuadrupedGymEnv(gym.Env):
             + vel_tracking_reward_y \
             + yaw_reward \
             + drift_reward_z \
+            + drift_reward_y \
             - 0.01 * energy_reward \
             # - 0.1 * np.linalg.norm(self.robot.GetBaseOrientation() - np.array([0,0,0,1]))
 
