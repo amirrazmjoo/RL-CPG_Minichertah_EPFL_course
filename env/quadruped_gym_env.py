@@ -226,7 +226,7 @@ class QuadrupedGymEnv(gym.Env):
                                          self._robot_config.VELOCITY_LIMITS,
                                          np.array([1]), # robot height
                                          np.array([1.0]*4),#Base orientation
-                                         np.array([1,0.5,0.5]),#Base linear velocity
+                                         np.array([2,0.5,0.5]),#Base linear velocity
                                          np.array([5,5,5])*2*np.pi,#Base angular velocity
                                          np.array([40,40,40,40]),#contact force
                                          np.array([1,1,1,1]),#\binary contact
@@ -238,7 +238,6 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([50,50,50,50]),#\phidot
                                          np.array([2]),#\des_vel
                                          np.array([np.pi]), # Des rotation
-                                         np.array([2 * np.pi]*4), #diff steering
                                          np.array([1.0]*self._action_dim)))#Prev normalized action
       
       lower_bound = np.concatenate((self._robot_config.LOWER_ANGLE_JOINT,
@@ -246,7 +245,7 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([0]),#robot height
                                          np.array([-1.0]*4),#base orientation
                                          np.array([0,-0.5,-0.5]), # base linear velocity
-                                         np.array([-5,-5,-5])*np.pi, # Base angular velocity
+                                         np.array([-5,-5,-5])*2*np.pi, # Base angular velocity
                                          np.array([0,0,0,0]),#contact force
                                          np.array([0,0,0,0]),#contact bolean
                                          np.array([0,0,0,0]), #r
@@ -257,7 +256,6 @@ class QuadrupedGymEnv(gym.Env):
                                          np.array([-50,-50,-50,-50]),#dot{phi}
                                          np.array([0]),#Des vel
                                          np.array([-np.pi]), #Des rotation
-                                         np.array([-2 * np.pi]*4), #diff steering
                                          np.array([-1.0]* self._action_dim)))#Prev normalized action
       observation_high = (upper_bound + OBSERVATION_EPS)
       observation_low = (lower_bound -  OBSERVATION_EPS)
@@ -311,7 +309,6 @@ class QuadrupedGymEnv(gym.Env):
                                           self._cpg.X_dot[2,:],
                                           np.array([self._des_vel]),
                                           np.array([self._des_yaw]),
-                                          diff_each_leg,
                                           self._prev_action))
 
     else:
