@@ -47,7 +47,7 @@ from typing import Callable
 
 
 LEARNING_ALG = "PPO" # or "SAC"
-LOAD_NN = False # if you want to initialize training with a previous model 
+LOAD_NN = True # if you want to initialize training with a previous model 
 NUM_ENVS = 1    # how many pybullet environments to create for data collection
 USE_GPU = True # make sure to install all necessary drivers 
 
@@ -67,7 +67,7 @@ else:
 
 if LOAD_NN:
     interm_dir = "./logs/intermediate_models/"
-    log_dir = interm_dir + '122823142930' # add path
+    log_dir = interm_dir + 'lr_course_sideways' # add path
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 
@@ -132,7 +132,7 @@ def clipping_schedule(initial_value: float) -> Callable[[float], float]:
 
     return func
 
-learning_rate = linear_schedule(1e-3)#
+learning_rate = lambda f: 1e-4#linear_schedule(1e-3)#lambda f: 1e-4
 clipping_rate = 0.2#clipping_schedule(0.3)
 ppo_config = {  "gamma":0.99, 
                 "n_steps": int(n_steps/NUM_ENVS), 

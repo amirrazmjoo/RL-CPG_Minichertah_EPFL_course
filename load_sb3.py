@@ -58,7 +58,7 @@ from utils.file_utils import get_latest_model, load_all_results
 LEARNING_ALG = "PPO"
 interm_dir = "./logs/intermediate_models/"
 # path to saved models, i.e. interm_dir + '121321105810'
-log_dir = interm_dir + '123123045152'
+log_dir = interm_dir + 'lr_course_sideways3'
 
 # initialize env configs (render at test time)
 # check ideal conditions, as well as robustness to UNSEEN noise during training
@@ -97,7 +97,7 @@ print("\nLoaded model", model_name, "\n")
 obs = env.reset()
 episode_reward = 0
 
-NUM_STEPS = 500
+NUM_STEPS = 2000
 
 # [TODO] initialize arrays to save data from simulation 
 cpg_states_hist = np.zeros((4, 6, NUM_STEPS))
@@ -124,8 +124,8 @@ for i in range(NUM_STEPS):
     # To get base position, for example: env.envs[0].env.robot.GetBasePosition() 
     # Get data from each leg
     for j in range(4):
-        #J, foot_pos = env.envs[0].env.robot.ComputeJacobianAndPosition(i)
-        #foot_pos_hist[j,:,i] = foot_pos
+        J, foot_pos = env.envs[0].env.robot.ComputeJacobianAndPosition(j)
+        foot_pos_hist[j,:,i] = foot_pos
         joint_vel_hist[j,:,i] = env.envs[0].env.robot.GetMotorVelocities()[3*j:3*(j+1)]
         joint_pos_hist[j,:,i] = env.envs[0].env.robot.GetMotorAngles()[3*j:3*(j+1)]
 
@@ -232,5 +232,14 @@ ax4.set_xlabel('Timesteps')
 for v in env.envs[0].env.reward_hist.values():    
     ax4.plot(v)
 ax4.legend([f'{i}' for i in env.envs[0].env.reward_hist.keys()])
+
+fig5, ax5 = plt.subplots(1,1)
+fig5.suptitle('Quadruped robot trajectory', weight='bold')
+ax5.plot(body_pose_hist[0,:], body_pose_hist[1,:])
+for v in env.envs[0].env.goal_history[1:]:
+    ax5.plot(v[0], v[1], marker='o', color='orange')
+ax5.set_ylabel('y', weight='bold')
+ax5.set_xlabel('x', weight='bold')
+ax5.legend(['Robot pose', 'Goals'])
 
 plt.show()

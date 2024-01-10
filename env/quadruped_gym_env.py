@@ -101,7 +101,7 @@ TIMESTEPS_STANDSTILL = 0
 #         torques are computed based on inverse kinematics + joint PD (or you can add Cartesian PD)
 
 
-EPISODE_LENGTH = 10   # how long before we reset the environment (max episode length for RL)
+EPISODE_LENGTH = 100   # how long before we reset the environment (max episode length for RL)
 MAX_FWD_VELOCITY = 1  # to avoid exploiting simulator dynamics, cap max reward for body velocity 
 
 # CPG quantities
@@ -199,11 +199,14 @@ class QuadrupedGymEnv(gym.Env):
     self._des_dyaw = 0
     self._last_obs = None
     self._obs_len = 0
+    self._goal_side = 1
     self.reward_hist = {
       "dist_to_goal": [],
       "angle_to_goal": [],
-      "angle_rate_to_goal": []
+      "vel_z": [],
+      "roll_pitch": []
     }
+    self.goal_history = []
 
     # if using CPG
     self.setupCPG()
@@ -457,7 +460,7 @@ class QuadrupedGymEnv(gym.Env):
   ######################################################################################
   # Termination and reward
   ######################################################################################
-  def is_fallen(self,dot_prod_min=0.85):
+  def is_fallen(self,dot_prod_min=0):
     """Decide whether the quadruped has fallen.
 
     If the up directions between the base and the world is larger (the dot
@@ -590,46 +593,45 @@ class QuadrupedGymEnv(gym.Env):
     """ Learn to move towards goal location. """
 
     # Curriculum learning factor 
-    #k_l = min(1, np.exp((self._total_timesteps - 500000)/50000))
-    k_l=1
+    k_l = min(1, np.exp((self._total_timesteps - 500000)/50000))
     curr_dist_to_goal, angle = self.get_distance_and_angle_to_goal()
 
     # Small to none psi at beginning
     reward_psi = 0.5 * np.exp(-np.linalg.norm(current_u[8:]))
 
     # minimize distance to goal (we want to move towards the goal)
-    #dist_reward = 5 * ( self._prev_pos_to_goal - curr_dist_to_goal)
-    dist_reward = 0.5 * np.exp(-curr_dist_to_goal/2)
+    dist_reward = 5 * ( self._prev_pos_to_goal - curr_dist_to_goal)
+    dist_reward += 1 * 1/curr_dist_to_goal
     self.reward_hist['dist_to_goal'].append(dist_reward)
     # minimize yaw deviation to goal (not at the beginning)
-    yaw_reward = -0.05 * np.exp(-np.abs(angle)/np.pi)
+    yaw_reward = -0.075 * np.abs(angle)
     self.reward_hist['angle_to_goal'].append(yaw_reward)
     #print(f'Angle to goal: {angle*180/np.pi}')
 
-    orientation_reward = 10 * (abs(angle) - abs(self._prev_angle_to_goal))
-    self.reward_hist['angle_rate_to_goal'].append(orientation_reward)
-
     # Survival reward (@ beginning)
-    #survival_reward = 0.01 * self._time_step * (1-k_l)
+    survival_reward = 0.01 * self._time_step
 
-      # velocity in z (should be zero)
+    # velocity in z (should be zero)
     vel_z_reward = -self.robot.GetBaseLinearVelocity()[2]**2
+    self.reward_hist['vel_z'].append(vel_z_reward)
     # Body roll and pitch penalty
     roll_pitch_reward = -0.005 * np.linalg.norm(self.robot.GetBaseAngularVelocity()[0:2])**2
-    #print(f'Velocity z: {roll_pitch_reward}')
+    self.reward_hist['roll_pitch'].append(roll_pitch_reward)
 
     # Smooth action reward
-    #smooth_action_reward = -0.05 * np.linalg.norm(current_u - self._last_action)**2
+    smooth_action_reward = -0.05 * np.linalg.norm(current_u - self._last_action)**2
     # minimize energy 
     energy_reward = 0 
     for tau,vel in zip(self._dt_motor_torques,self._dt_motor_velocities):
       energy_reward += np.abs(np.dot(tau,vel)) * self._time_step
-    #print(f'Energy: {0.001*energy_reward}')
 
     reward = dist_reward \
             + k_l*vel_z_reward \
             + k_l*yaw_reward \
             + (1-k_l) * reward_psi \
+            + k_l*roll_pitch_reward \
+            + smooth_action_reward \
+            + (1-k_l)*survival_reward \
             - 0.001 * energy_reward 
     
     return max(reward,0) # keep rewards positive
@@ -904,9 +906,12 @@ class QuadrupedGymEnv(gym.Env):
       pass
     c_factor = max(0, 500000 - self._total_timesteps)
     #self._goal_location = 6 * np.array([np.random.rand() - np.exp(-c_factor/50000)*0.5, np.exp(-c_factor/50000)*(np.random.rand() - 0.5)])
-    r_angle = self.robot.GetBaseOrientationRollPitchYaw()[2]
-    self._goal_location = 3*np.array([np.cos(r_angle), np.sin(r_angle)])
+    self._goal_side = -1*self._goal_side
+    self._goal_location = 6* np.array([np.random.rand() - 0.5,np.random.rand() - 0.5])
+    #r_angle = self.robot.GetBaseOrientationRollPitchYaw()[2]
+    #self._goal_location = 5*np.array([np.cos(r_angle), np.sin(r_angle)])
     self._goal_location += self.robot.GetBasePosition()[0:2]
+    self.goal_history.append(self._goal_location)
     print(f'GOAL LOCATION: {self._goal_location}')
     sh_colBox = self._pybullet_client.createCollisionShape(self._pybullet_client.GEOM_BOX,
         halfExtents=[0.2,0.2,0.2])
