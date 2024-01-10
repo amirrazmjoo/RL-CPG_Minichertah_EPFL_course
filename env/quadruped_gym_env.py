@@ -636,7 +636,7 @@ class QuadrupedGymEnv(gym.Env):
       self._tot_time_step += 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
+      self._des_vel = 1 #0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)
