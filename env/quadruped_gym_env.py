@@ -98,7 +98,7 @@ VIDEO_LOG_DIRECTORY = 'videos/' + datetime.datetime.now().strftime("vid-%Y-%m-%d
 #         torques are computed based on inverse kinematics + joint PD (or you can add Cartesian PD)
 
 
-EPISODE_LENGTH = 10   # how long before we reset the environment (max episode length for RL)
+EPISODE_LENGTH = 1000   # how long before we reset the environment (max episode length for RL)
 MAX_FWD_VELOCITY = 1  # to avoid exploiting simulator dynamics, cap max reward for body velocity 
 
 # CPG quantities
@@ -597,7 +597,7 @@ class QuadrupedGymEnv(gym.Env):
       if dist_to_goal < 0.5:
         self._reset_goal()
 
-    return np.array(self._noisy_observation()), reward, done, {'base_pos': self.robot.GetBasePosition()} 
+    return np.array(self._noisy_observation()), reward, done, {'base_pos': self.robot.GetBasePosition(),'base_orn': self.robot.GetBaseOrientation(),'base_vel_lin':self.robot.GetBaseLinearVelocity(),'base_vel_angular':self.robot.GetBaseAngularVelocity(),'joint_angle':self.robot.GetMotorAngles(),'joint_angle':self.robot.GetMotorAngles(), 'cpg_main':self._cpg.X,'cpg_deriv':self._cpg.X_dot} 
 
   ######################################################################################
   # Reset
@@ -629,16 +629,17 @@ class QuadrupedGymEnv(gym.Env):
         self._add_noise = False # double check
         self._using_test_env = False # double check 
 
-      if self._add_noise:
+      if self._add_noise: 
         ground_mu_k = mu_min+(1-mu_min)*np.random.random()
         self._ground_mu_k = ground_mu_k
         self._pybullet_client.changeDynamics(self.plane, -1, lateralFriction=ground_mu_k)
         if self._is_render:
           print('ground friction coefficient is', ground_mu_k)
       self._tot_time_step += 1
+      # self._ground_mu_k = 1
       print("Total_time_step = ", self._tot_time_step)
       # self._tot_time_step = 1e6
-      self._des_vel = 1 #0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
+      self._des_vel = 0.6 #0.5 * (np.tanh((self._tot_time_step - 1e3)/4e2)+1)
       self._des_yaw = 0#(np.tanh((self._tot_time_step - 1e3)/4e2)+1) * np.pi * (np.random.rand() - 0.5)
       print("des_vel = ", self._des_vel)
       print("des_yaw = ", self._des_yaw)

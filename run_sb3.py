@@ -68,7 +68,7 @@ else:
 
 if LOAD_NN:
     # interm_dir = cur_dir + "/logs/intermediate_models/"
-    log_dir = '/remote/idiap.svm/temp.rli01/afard/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_12_18_19_04/'
+    log_dir = '/home/amir/Git/RL-CPG_Minichertah_EPFL_course/env/logs/intermediate_models/CPG_RL_FWD_FULL_VEL_iter_dep_12_18_19_04/'
     stats_path = os.path.join(log_dir, "vec_normalize.pkl")
     model_name = get_latest_model(log_dir)
 

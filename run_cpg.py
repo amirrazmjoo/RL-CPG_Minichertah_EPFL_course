@@ -62,7 +62,10 @@ env = QuadrupedGymEnv(render=True,              # visualize
                     )
 
 # initialize Hopf Network, supply gait
-cpg = HopfNetwork(time_step=TIME_STEP,gait = "PACE")
+cpg = HopfNetwork(time_step=TIME_STEP,gait = "WALK",omega_stance=0.5*2*np.pi, omega_swing=8*2*np.pi,alpha=20,coupling_strength=1,ground_clearance=0.03,ground_penetration=0.015,robot_height=0.25,des_step_len=0.02)
+# cpg = HopfNetwork(time_step=TIME_STEP,gait = "PACE",omega_stance=12*2*np.pi, omega_swing=18*2*np.pi,alpha=20,coupling_strength=1.25,ground_clearance=0.07,ground_penetration=0.025,robot_height=0.25,des_step_len=0.115)
+
+
 
 TEST_STEPS = int(10 / (TIME_STEP))
 t = np.arange(TEST_STEPS)*TIME_STEP
@@ -79,6 +82,8 @@ kpCartesian = np.diag([500]*3)
 kdCartesian = np.diag([20]*3)
 XS_traj = []
 ZS_traj = []
+energy = 0
+start_point = env.robot.GetBasePosition()
 for j in range(TEST_STEPS):
   # initialize torque array to send to motors
   action = np.zeros(12) 
@@ -113,12 +118,20 @@ for j in range(TEST_STEPS):
 
     # Set tau for legi in action vector
     action[3*i:3*i+3] = tau
-
-  # send torques to robot and simulate TIME_STEP seconds 
+    
+    # energy += action @ np.abs(dq) * 0.001
+  # send torques to robot and simulate TIME_STEP second
+  for ind_join in range(action.shape[0]):
+      energy += max(action[ind_join] * dq[ind_join] * 0.001,0) 
   env.step(action) 
   time.sleep(0.001)
   # [TODO] save any CPG or robot states
-
+end_point = env.robot.GetBasePosition()
+d = np.linalg.norm(np.array(end_point) - np.array(start_point))
+print("consumed energy is:", energy)
+print("distance traveled is:", d)
+CoT = energy / (12 * 9.81 * d)
+print("CoT is", CoT)
 XS = np.array(XS_traj)
 ZS = np.array(ZS_traj)
 print(XS.shape)
